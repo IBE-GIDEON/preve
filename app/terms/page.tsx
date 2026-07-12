@@ -16,7 +16,7 @@ export default function TermsPage() {
         <ThemeToggle />
       </header>
 
-      <main style={{ flex: 1, maxWidth: "760px", width: "100%", margin: "0 auto", padding: "3rem 2rem 5rem" }}>
+      <main className="legal-page-main">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}

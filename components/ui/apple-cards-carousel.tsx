@@ -291,7 +291,7 @@ export function Card({ card, index }: { card: Card; index: number }) {
               </button>
 
               {/* Modal Image Header */}
-              <div style={{ width: "100%", height: "260px", position: "relative" }}>
+              <div className="carousel-modal-image-header" style={{ width: "100%", height: "260px", position: "relative" }}>
                 <img
                   src={card.src}
                   alt={card.title}
@@ -300,7 +300,7 @@ export function Card({ card, index }: { card: Card; index: number }) {
               </div>
 
               {/* Modal Contents */}
-              <div style={{ padding: "2rem" }}>
+              <div className="carousel-modal-content" style={{ padding: "2rem" }}>
                 <span 
                   style={{ 
                     fontSize: "0.75rem", 

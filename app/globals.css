@@ -2810,3 +2810,90 @@ body {
 .footer-bottom-link:hover {
   color: var(--footer-hover);
 }
+
+/* Responsive Grid Order & Typography scaling */
+@media (max-width: 1024px) {
+  .landing-community {
+    grid-template-columns: 1fr;
+  }
+  /* Place the CardStack below the title & copy on tablets/mobile */
+  .landing-community > div:first-child {
+    order: 2;
+  }
+  .landing-community > .landing-section-copy {
+    order: 1;
+  }
+
+  .landing-footer-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 3rem !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .carousel-modal-content {
+    padding: 1.25rem 1.5rem !important;
+  }
+  
+  .carousel-modal-image-header {
+    height: 180px !important;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .footer-bottom-links {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 550px) {
+  .landing-footer-container {
+    grid-template-columns: 1fr !important;
+    gap: 2.25rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .legacy-landing-hero h1 {
+    font-size: 2.1rem !important;
+  }
+  
+  .legacy-landing-hero p {
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+  }
+
+  .landing-section-copy h2,
+  .landing-section-heading h2,
+  .landing-final h2 {
+    font-size: 1.85rem !important;
+  }
+
+  .landing-section {
+    padding: 4rem 1rem !important;
+  }
+}
+
+/* Legal Documents responsive wrapper */
+.legal-page-main {
+  flex: 1;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 3rem 2rem 5rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+  .legal-page-main {
+    padding: 2rem 1.25rem 4rem !important;
+  }
+  
+  .legal-page-main h1 {
+    font-size: 2.4rem !important;
+  }
+}
