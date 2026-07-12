@@ -94,6 +94,7 @@ export default function FloatingIcons() {
   return (
     <div 
       ref={containerRef}
+      className="floating-icons-layer"
       style={{
         position: 'absolute',
         top: 0,
@@ -135,6 +136,7 @@ export default function FloatingIcons() {
         return (
           <motion.div
             key={icon.name}
+            className={`floating-social-icon floating-social-icon-${index}`}
             style={{
               position: 'absolute',
               left: `${baseX}%`,
@@ -172,6 +174,7 @@ export default function FloatingIcons() {
           >
             {/* Nested wrapper for realistic "water bubble" physics on direct hover */}
             <motion.div
+              className="floating-social-icon-shell"
               whileHover={{ 
                 scale: 1.18,
                 y: -7,

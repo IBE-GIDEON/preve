@@ -2632,6 +2632,50 @@ body {
   color: var(--background);
 }
 
+/* Keep hero social icons elegant on small screens */
+@media (max-width: 760px) {
+  .floating-icons-layer {
+    opacity: 0.58;
+    pointer-events: none !important;
+  }
+
+  .floating-social-icon {
+    display: none;
+  }
+
+  .floating-social-icon-1,
+  .floating-social-icon-4,
+  .floating-social-icon-8 {
+    display: block;
+  }
+
+  .floating-social-icon-1 {
+    left: 16% !important;
+    top: 20% !important;
+  }
+
+  .floating-social-icon-4 {
+    left: 84% !important;
+    top: 24% !important;
+  }
+
+  .floating-social-icon-8 {
+    left: 18% !important;
+    top: 78% !important;
+  }
+
+  .floating-social-icon svg {
+    height: 30px;
+    width: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .floating-icons-layer {
+    display: none;
+  }
+}
+
 /* Footer layout rules */
 .landing-footer {
   background: var(--footer-bg);
@@ -2895,5 +2939,183 @@ body {
   
   .legal-page-main h1 {
     font-size: 2.4rem !important;
+  }
+}
+
+/* Landing page responsive stability */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.legacy-landing-shell,
+.landing-section,
+.landing-final-section,
+.landing-footer,
+.landing-footer-container {
+  max-width: 100%;
+}
+
+.legacy-landing-hero,
+.landing-section-copy,
+.landing-section-heading,
+.landing-specs-copy,
+.landing-final-card,
+.footer-brand,
+.footer-column {
+  overflow-wrap: break-word;
+}
+
+.landing-about > *,
+.landing-community > *,
+.landing-insights > *,
+.landing-feature-grid > *,
+.landing-specs-container > *,
+.landing-footer-container > * {
+  min-width: 0;
+}
+
+.landing-about-demo,
+.landing-community-demo {
+  min-width: 0;
+  width: 100%;
+}
+
+.landing-about-demo .live-feed-demo-container,
+.landing-community-demo > div,
+.landing-community-demo > div > div {
+  max-width: 100% !important;
+}
+
+.landing-insights .hide-scrollbar {
+  max-width: 100%;
+  padding-left: clamp(0.5rem, 3vw, 2rem) !important;
+  padding-right: clamp(0.5rem, 3vw, 2rem) !important;
+  scroll-padding-inline: clamp(0.5rem, 3vw, 2rem);
+}
+
+.landing-insights .hide-scrollbar > div {
+  width: min(280px, calc(100vw - 3rem)) !important;
+}
+
+.legacy-landing-button,
+.landing-primary-cta,
+.footer-newsletter-btn {
+  max-width: 100%;
+}
+
+.footer-bottom-links {
+  flex-wrap: wrap;
+  row-gap: 0.75rem;
+}
+
+@media (max-width: 1180px) {
+  .landing-section,
+  .landing-final-section {
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .landing-about,
+  .landing-community,
+  .landing-insights,
+  .landing-specs-container {
+    grid-template-columns: 1fr !important;
+  }
+
+  .landing-about,
+  .landing-community {
+    gap: 2.5rem;
+  }
+
+  .landing-insights {
+    gap: 1.25rem;
+  }
+
+  .landing-section-heading,
+  .landing-section-heading.narrow,
+  .landing-section-copy,
+  .landing-specs-copy {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .legacy-landing-shell {
+    min-height: 100svh;
+  }
+
+  .logo {
+    min-width: 0;
+  }
+
+  .logo span {
+    min-width: 0;
+  }
+
+  .legacy-landing-header {
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .legacy-landing-main {
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+
+  .legacy-landing-hero {
+    width: 100%;
+  }
+
+  .legacy-landing-button {
+    white-space: normal;
+  }
+
+  .landing-section,
+  .landing-final-section {
+    padding-left: clamp(1rem, 5vw, 1.25rem) !important;
+    padding-right: clamp(1rem, 5vw, 1.25rem) !important;
+  }
+
+  .landing-feature-grid.three .landing-feature {
+    height: auto !important;
+    min-height: 0;
+  }
+
+  .landing-feature-grid.three .landing-feature > div:first-child {
+    height: clamp(160px, 48vw, 200px) !important;
+  }
+
+  .landing-about-demo .live-feed-demo-container {
+    height: min(460px, calc(100svh - 8rem)) !important;
+    min-height: 360px;
+    padding: 1rem !important;
+  }
+
+  .landing-spec-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .landing-final-card {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+
+  .footer-bottom-links {
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .landing-footer {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .footer-newsletter-input,
+  .footer-newsletter-btn {
+    min-height: 44px;
   }
 }
