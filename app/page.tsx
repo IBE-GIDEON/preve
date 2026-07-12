@@ -180,7 +180,7 @@ export default function LandingPage() {
           >
             <h1 id="legacy-hero-title">Search Everything You&apos;ve Ever Posted</h1>
             <p>
-              The Google Photos for your words. Find, reuse, and organize your content across all platforms instantly.
+              The gallery for your words. Find, reuse, and organize your content across all platforms instantly.
             </p>
 
             <Link href="/auth?next=/onboarding" className="legacy-landing-link">
