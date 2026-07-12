@@ -1,0 +1,305 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { motion } from "framer-motion";
+import type { Platform, Post, PostKind } from "../../data/mockPosts";
+import { getPlatformColor } from "../../data/mockPosts";
+import { PLATFORM_ORDER } from "../../lib/preveState";
+import { getArchiveStats, importManualArchive, loadArchivePosts } from "../../../lib/archive/client";
+
+const KIND_OPTIONS: PostKind[] = ["Post", "Comment", "Thread", "Article"];
+
+const numberFormatter = new Intl.NumberFormat("en-US");
+
+const fieldStyle: CSSProperties = {
+  width: "100%",
+  border: "1px solid var(--input-border)",
+  borderRadius: "12px",
+  background: "var(--input-bg)",
+  color: "var(--input-text)",
+  font: "inherit",
+  outline: "none",
+  padding: "0.85rem 1rem",
+};
+
+function formatNumber(value: number) {
+  return numberFormatter.format(value);
+}
+
+function getPlatformName(platform: Platform) {
+  return platform === "X" ? "X (Twitter)" : platform;
+}
+
+function getPlatformMark(platform: Platform) {
+  return platform === "LinkedIn" ? "in" : platform.charAt(0);
+}
+
+function countImportItems(rawText: string) {
+  return rawText
+    .split(/\n\s*\n/g)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+}
+
+export default function ImportsPage() {
+  const [archivePosts, setArchivePosts] = useState<Post[]>([]);
+  const [platform, setPlatform] = useState<Platform>("Reddit");
+  const [kind, setKind] = useState<PostKind>("Post");
+  const [sourceTitle, setSourceTitle] = useState("");
+  const [rawText, setRawText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
+  const importCount = countImportItems(rawText);
+  const connectedPlatforms = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0).length;
+
+  useEffect(() => {
+    void refreshArchive();
+  }, []);
+
+  async function refreshArchive() {
+    try {
+      setLoading(true);
+      const result = await loadArchivePosts();
+      setArchivePosts(result.posts);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Could not load your archive.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleManualImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setImporting(true);
+    setStatusMessage("");
+
+    try {
+      const imported = await importManualArchive({
+        platform,
+        kind,
+        sourceTitle,
+        rawText,
+      });
+      setRawText("");
+      setStatusMessage(`Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"} into your archive.`);
+      await refreshArchive();
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Import failed.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function focusPlatformImport(nextPlatform: Platform) {
+    setPlatform(nextPlatform);
+    textareaRef.current?.focus();
+  }
+
+  return (
+    <div className="dashboard-content-area">
+      <main className="dashboard-main" style={{ paddingTop: "4rem", alignItems: "flex-start" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          style={{ width: "100%", maxWidth: "640px", margin: "0 auto" }}
+        >
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "2rem" }}>Connected Platforms</h1>
+
+          <form
+            onSubmit={handleManualImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginBottom: "1rem" }}>
+              <div>
+                <h2 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "0.35rem" }}>Manual Import</h2>
+                <div style={{ opacity: 0.55, fontSize: "0.9rem" }}>
+                  {importCount > 0 ? `${formatNumber(importCount)} ready to import` : "Paste content to index"}
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={importing || importCount === 0}
+                style={{
+                  background: "var(--foreground)",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "var(--background)",
+                  cursor: importing || importCount === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  height: "fit-content",
+                  opacity: importing || importCount === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1rem",
+                }}
+              >
+                {importing ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0.75rem" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.85rem", opacity: 0.75 }}>
+                Platform
+                <select value={platform} onChange={(event) => setPlatform(event.target.value as Platform)} style={fieldStyle}>
+                  {PLATFORM_ORDER.map((item) => (
+                    <option key={item} value={item}>
+                      {getPlatformName(item)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", fontSize: "0.85rem", opacity: 0.75 }}>
+                Type
+                <select value={kind} onChange={(event) => setKind(event.target.value as PostKind)} style={fieldStyle}>
+                  {KIND_OPTIONS.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <input
+              value={sourceTitle}
+              onChange={(event) => setSourceTitle(event.target.value)}
+              placeholder="Source title"
+              style={{ ...fieldStyle, marginTop: "0.75rem" }}
+            />
+            <textarea
+              ref={textareaRef}
+              value={rawText}
+              onChange={(event) => setRawText(event.target.value)}
+              placeholder="Paste posts or comments here. Separate each item with a blank line."
+              rows={8}
+              style={{ ...fieldStyle, marginTop: "0.75rem", resize: "vertical", lineHeight: 1.5 }}
+            />
+
+            {statusMessage && (
+              <div style={{ color: statusMessage.startsWith("Imported") ? "#16a34a" : "#F05522", marginTop: "0.75rem", fontSize: "0.9rem" }}>
+                {statusMessage}
+              </div>
+            )}
+          </form>
+
+          <div
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              overflow: "hidden",
+            }}
+          >
+            {PLATFORM_ORDER.map((item, index) => {
+              const count = totals.platformCounts[item];
+              const isConnected = count > 0;
+
+              return (
+                <div
+                  key={item}
+                  style={{
+                    padding: "2rem",
+                    borderBottom: index === PLATFORM_ORDER.length - 1 ? "none" : "1px solid rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "1rem",
+                      marginBottom: isConnected ? "1.5rem" : 0,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <div
+                        style={{
+                          background: getPlatformColor(item),
+                          color: "white",
+                          width: "40px",
+                          height: "40px",
+                          borderRadius: "8px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: "bold",
+                          fontSize: "1.2rem",
+                        }}
+                      >
+                        {getPlatformMark(item)}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: "1.1rem" }}>{getPlatformName(item)}</div>
+                        <div style={{ fontSize: "0.8rem", opacity: 0.5 }}>
+                          {loading ? "Checking archive" : isConnected ? "Ready for search" : "No items imported"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => focusPlatformImport(item)}
+                      style={{
+                        background: "rgba(0,0,0,0.05)",
+                        border: "none",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "8px",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        color: "var(--foreground)",
+                      }}
+                    >
+                      {isConnected ? "Add more" : "Import"}
+                    </button>
+                  </div>
+
+                  {isConnected && (
+                    <div style={{ display: "flex", gap: "3rem", opacity: 0.8 }}>
+                      <div>
+                        <div style={{ fontSize: "1.5rem", fontWeight: 600 }}>{formatNumber(count)}</div>
+                        <div style={{ fontSize: "0.8rem", opacity: 0.6 }}>Items</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "1.5rem", fontWeight: 600 }}>Active</div>
+                        <div style={{ fontSize: "0.8rem", opacity: 0.6 }}>Status</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </main>
+
+      <aside className="dashboard-right-sidebar">
+        <div>
+          <h3 className="suggestions-heading" style={{ marginBottom: "1rem" }}>
+            Import Status
+          </h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem", fontSize: "0.9rem" }}>
+            <div>
+              <div style={{ opacity: 0.5, fontSize: "0.8rem" }}>Indexed</div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{formatNumber(totals.indexed)}</div>
+            </div>
+            <div>
+              <div style={{ opacity: 0.5, fontSize: "0.8rem" }}>Sources</div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{connectedPlatforms}</div>
+            </div>
+            <div style={{ opacity: 0.65, lineHeight: 1.5 }}>
+              Manual imports are stored in your private Supabase archive and become searchable from the dashboard.
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
