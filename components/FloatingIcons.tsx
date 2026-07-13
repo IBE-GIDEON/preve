@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { 
   FaInstagram, 
   FaLinkedin, 
-  FaTwitter, // using FaTwitter instead of X for better compatibility with FontAwesome 5
   FaYoutube, 
   FaReddit, 
   FaFacebook, 
@@ -15,11 +14,12 @@ import {
   FaTwitch, 
   FaDiscord 
 } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 const ICONS = [
   { name: "Instagram", Component: FaInstagram, color: "#E1306C" },
   { name: "LinkedIn", Component: FaLinkedin, color: "#0A66C2" },
-  { name: "X", Component: FaTwitter, color: "#1DA1F2" }, // Twitter Blue for classic logo
+  { name: "X", Component: FaXTwitter, color: "var(--foreground)" },
   { name: "YouTube", Component: FaYoutube, color: "#FF0000" },
   { name: "Reddit", Component: FaReddit, color: "#FF4500" },
   { name: "Facebook", Component: FaFacebook, color: "#1877F2" },

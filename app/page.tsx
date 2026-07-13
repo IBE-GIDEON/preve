@@ -20,7 +20,8 @@ import FloatingIcons from "../components/FloatingIcons";
 import LiveFeedDemo from "../components/LiveFeedDemo";
 import { CommunityCardStack } from "../components/CommunityCardStack";
 import { WhyItMattersCarousel } from "../components/WhyItMattersCarousel";
-import { FaTwitter, FaLinkedin, FaReddit } from "react-icons/fa";
+import { FaLinkedin, FaReddit } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 type Feature = {
   title: string;
@@ -33,7 +34,7 @@ const ConnectWidget = () => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', width: '100%', padding: '1.25rem', boxSizing: 'border-box' }}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--input-border)', borderRadius: '8px', padding: '0.6rem 0.8rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        <FaTwitter size={14} color="#1DA1F2" />
+        <FaXTwitter size={14} color="var(--foreground)" />
         <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>@arivers</span>
       </div>
       <span style={{ fontSize: '0.7rem', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>

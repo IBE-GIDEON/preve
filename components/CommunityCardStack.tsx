@@ -1,7 +1,8 @@
 "use client";
 
 import { CardStack, CardItem } from "./ui/card-stack";
-import { FaTwitter, FaLinkedin, FaReddit } from "react-icons/fa";
+import { FaLinkedin, FaReddit } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 export const Highlight = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -63,7 +64,7 @@ const CARDS: CardItem[] = [
               <span style={{ fontSize: "0.7rem", opacity: 0.5, color: "var(--foreground)" }}>Chief Shitposter @ X</span>
             </div>
           </div>
-          <FaTwitter size={16} color="var(--foreground)" />
+          <FaXTwitter size={16} color="var(--foreground)" />
         </div>
         <p style={{ margin: 0, fontSize: "0.82rem", lineHeight: "1.4", color: "var(--foreground)", opacity: 0.9, flex: 1 }}>
           I dont like this Twitter thing,{" "}

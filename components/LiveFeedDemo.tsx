@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, BookOpen, Search } from "lucide-react";
-import { FaLinkedin, FaTwitter } from "react-icons/fa";
+import { FaLinkedin } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 const DEMO_PROFILE_IMAGE_URL = "https://randomuser.me/api/portraits/men/32.jpg";
 
@@ -54,7 +55,7 @@ const CYCLES: QueryCycle[] = [
         author: "@arivers",
         avatarColor: "#000000",
         content: "Pricing Tip: People buy faster when the immediate next step feels smaller than the overall problem they are trying to solve.",
-        Icon: FaTwitter,
+        Icon: FaXTwitter,
         iconColor: "var(--foreground)"
       }
     ]
@@ -69,7 +70,7 @@ const CYCLES: QueryCycle[] = [
         author: "@arivers",
         avatarColor: "#000000",
         content: "We started sharing our revenue metrics on Day 1. It felt terrifying. But it built a level of loyalty that no marketing budget could ever buy.",
-        Icon: FaTwitter,
+        Icon: FaXTwitter,
         iconColor: "var(--foreground)"
       },
       {
