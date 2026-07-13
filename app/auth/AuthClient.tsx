@@ -7,12 +7,13 @@ import { FormEvent, useMemo, useState } from "react";
 import ThemeToggle from "../../components/ThemeToggle";
 import { getSafeRedirectPath } from "../../lib/auth/redirect";
 import { createClient } from "../../lib/supabase/client";
+import type { SupabasePublicEnv } from "../../lib/supabase/env";
 
 type AuthMode = "sign-in" | "sign-up";
 
 interface AuthClientProps {
-  configured: boolean;
   bypass: boolean;
+  supabaseEnv: SupabasePublicEnv | null;
 }
 
 function getErrorCopy(code: string | null) {
@@ -25,9 +26,10 @@ function getErrorCopy(code: string | null) {
   return "";
 }
 
-export default function AuthClient({ configured, bypass }: AuthClientProps) {
+export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const configured = Boolean(supabaseEnv);
   const isBypassActive = !configured && bypass;
   
   const nextPath = getSafeRedirectPath(searchParams.get("next"), "/onboarding");
@@ -38,14 +40,14 @@ export default function AuthClient({ configured, bypass }: AuthClientProps) {
   const [message, setMessage] = useState(getErrorCopy(searchParams.get("error")));
   const [loading, setLoading] = useState(false);
   const supabase = useMemo(() => {
-    if (!configured) return null;
+    if (!supabaseEnv) return null;
 
     try {
-      return createClient();
+      return createClient(supabaseEnv);
     } catch {
       return null;
     }
-  }, [configured]);
+  }, [supabaseEnv]);
 
   async function handlePasswordAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

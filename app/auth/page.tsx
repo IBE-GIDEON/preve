@@ -1,14 +1,16 @@
 import { Suspense } from "react";
-import { hasSupabasePublicEnv, isLocalPreviewAuthBypassEnabled } from "../../lib/supabase/env";
+import { getSupabasePublicEnv, isLocalPreviewAuthBypassEnabled } from "../../lib/supabase/env";
 import AuthClient from "./AuthClient";
 
+export const dynamic = "force-dynamic";
+
 export default function AuthPage() {
-  const configured = hasSupabasePublicEnv();
+  const supabaseEnv = getSupabasePublicEnv();
   const bypass = isLocalPreviewAuthBypassEnabled();
 
   return (
     <Suspense fallback={null}>
-      <AuthClient configured={configured} bypass={bypass} />
+      <AuthClient bypass={bypass} supabaseEnv={supabaseEnv} />
     </Suspense>
   );
 }
