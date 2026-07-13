@@ -1,29 +1,22 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import ThemeToggle from "../../components/ThemeToggle";
 import { getSafeRedirectPath } from "../../lib/auth/redirect";
+import { authErrorCodeCopy, friendlyAuthError } from "../../lib/auth/error-messages";
+import { PASSWORD_HINT, validateEmail, validatePassword, type AuthMode } from "../../lib/auth/validation";
 import { createClient } from "../../lib/supabase/client";
 import type { SupabasePublicEnv } from "../../lib/supabase/env";
 
-type AuthMode = "sign-in" | "sign-up";
+type Banner = { type: "error" | "info"; text: string } | null;
 
 interface AuthClientProps {
   bypass: boolean;
   supabaseEnv: SupabasePublicEnv | null;
-}
-
-function getErrorCopy(code: string | null) {
-  if (code === "auth_not_configured") {
-    return "Supabase Auth is not configured yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to enable real sign in.";
-  }
-  if (code === "callback_failed") {
-    return "The auth callback could not complete. Try signing in again.";
-  }
-  return "";
 }
 
 export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
@@ -31,17 +24,22 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
   const searchParams = useSearchParams();
   const configured = Boolean(supabaseEnv);
   const isBypassActive = !configured && bypass;
-  
+
   const nextPath = getSafeRedirectPath(searchParams.get("next"), "/onboarding");
   const initialMode: AuthMode = searchParams.get("mode") === "sign-up" ? "sign-up" : "sign-in";
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState(getErrorCopy(searchParams.get("error")));
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [banner, setBanner] = useState<Banner>(() => {
+    const text = authErrorCodeCopy(searchParams.get("error"));
+    return text ? { type: "error", text } : null;
+  });
   const [loading, setLoading] = useState(false);
+
   const supabase = useMemo(() => {
     if (!supabaseEnv) return null;
-
     try {
       return createClient(supabaseEnv);
     } catch {
@@ -49,30 +47,45 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
     }
   }, [supabaseEnv]);
 
+  function validate() {
+    const errors = {
+      email: validateEmail(email),
+      password: validatePassword(password, mode),
+    };
+    setFieldErrors(errors);
+    return !errors.email && !errors.password;
+  }
+
+  // Validate a single field on blur so format problems surface before submit.
+  function validateField(field: "email" | "password") {
+    const message = field === "email" ? validateEmail(email) : validatePassword(password, mode);
+    setFieldErrors((prev) => ({ ...prev, [field]: message }));
+  }
+
   async function handlePasswordAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setBanner(null);
+    if (!validate()) return;
+
     setLoading(true);
-    setMessage("");
 
     if (!supabase) {
       if (isBypassActive) {
-        // Simulate a small network delay to make the flow realistic
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        setLoading(false);
+        await new Promise((resolve) => setTimeout(resolve, 700));
         router.push(nextPath);
         router.refresh();
       } else {
         setLoading(false);
-        setMessage("Supabase is not configured yet.");
+        setBanner({ type: "error", text: "Sign in isn't available right now. Please try again shortly." });
       }
       return;
     }
 
     const result =
       mode === "sign-in"
-        ? await supabase.auth.signInWithPassword({ email, password })
+        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
         : await supabase.auth.signUp({
-            email,
+            email: email.trim(),
             password,
             options: {
               emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
@@ -82,12 +95,15 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
     setLoading(false);
 
     if (result.error) {
-      setMessage(result.error.message);
+      setBanner({ type: "error", text: friendlyAuthError(result.error.message) });
       return;
     }
 
     if (mode === "sign-up" && !result.data.session) {
-      setMessage("Check your email to confirm your account, then come back to sign in.");
+      setBanner({
+        type: "info",
+        text: "Almost there — check your email to confirm your account, then sign in.",
+      });
       return;
     }
 
@@ -96,18 +112,17 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
   }
 
   async function handleGoogleAuth() {
+    setBanner(null);
     setLoading(true);
-    setMessage("");
 
     if (!supabase) {
       if (isBypassActive) {
         await new Promise((resolve) => setTimeout(resolve, 600));
-        setLoading(false);
         router.push(nextPath);
         router.refresh();
       } else {
         setLoading(false);
-        setMessage("Supabase is not configured yet.");
+        setBanner({ type: "error", text: "Sign in isn't available right now. Please try again shortly." });
       }
       return;
     }
@@ -121,8 +136,14 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
 
     if (error) {
       setLoading(false);
-      setMessage(error.message);
+      setBanner({ type: "error", text: friendlyAuthError(error.message) });
     }
+  }
+
+  function switchMode() {
+    setMode((current) => (current === "sign-in" ? "sign-up" : "sign-in"));
+    setBanner(null);
+    setFieldErrors({});
   }
 
   return (
@@ -152,13 +173,13 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
           style={{ width: "100%", maxWidth: "400px" }}
         >
           <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <h1 
-              style={{ 
-                fontSize: "2.4rem", 
-                fontFamily: "'Newsreader', Georgia, serif", 
-                fontWeight: 500, 
-                letterSpacing: "-0.01em", 
-                marginBottom: "0.75rem" 
+            <h1
+              style={{
+                fontSize: "2.4rem",
+                fontFamily: "'Newsreader', Georgia, serif",
+                fontWeight: 500,
+                letterSpacing: "-0.01em",
+                marginBottom: "0.75rem",
               }}
             >
               {mode === "sign-in" ? "Sign in to preve" : "Create your account"}
@@ -176,50 +197,82 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
               borderRadius: "16px",
               background: "var(--input-bg)",
               padding: "1.5rem",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.015)"
+              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.015)",
             }}
           >
-
-
-            {message && (
-              <div className="auth-alert error">
-                {message}
+            {banner && (
+              <div className={`auth-alert ${banner.type}`} role={banner.type === "error" ? "alert" : "status"}>
+                {banner.text}
               </div>
             )}
 
-            <form onSubmit={handlePasswordAuth} style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              <input
-                required
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                disabled={loading}
-                className="auth-input"
-              />
-              <input
-                required
-                minLength={8}
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                disabled={loading}
-                className="auth-input"
-              />
-              <button 
-                disabled={loading} 
-                className="auth-primary-btn"
-              >
+            <form onSubmit={handlePasswordAuth} noValidate style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              <div>
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
+                  onBlur={() => validateField("email")}
+                  disabled={loading}
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  aria-describedby={fieldErrors.email ? "email-error" : undefined}
+                  className={`auth-input${fieldErrors.email ? " invalid" : ""}`}
+                />
+                {fieldErrors.email && (
+                  <p id="email-error" className="auth-field-error">
+                    {fieldErrors.email}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <div className="auth-password-wrap">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                    placeholder="Password"
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
+                    onBlur={() => validateField("password")}
+                    disabled={loading}
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={fieldErrors.password ? "password-error" : undefined}
+                    className={`auth-input${fieldErrors.password ? " invalid" : ""}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="auth-password-toggle"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {fieldErrors.password ? (
+                  <p id="password-error" className="auth-field-error">
+                    {fieldErrors.password}
+                  </p>
+                ) : mode === "sign-up" ? (
+                  <p className="auth-field-hint">{PASSWORD_HINT}</p>
+                ) : null}
+              </div>
+
+              <button disabled={loading} className="auth-primary-btn">
                 {loading ? "Working..." : mode === "sign-in" ? "Sign in" : "Create account"}
               </button>
             </form>
 
-            <button
-              onClick={handleGoogleAuth}
-              disabled={loading}
-              className="auth-google-btn"
-            >
+            <button onClick={handleGoogleAuth} disabled={loading} className="auth-google-btn">
               <svg style={{ width: "16px", height: "16px", flexShrink: 0 }} viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 15.03 1 12 1 7.24 1 3.24 3.73 1.34 7.72l3.96 3.07C6.27 7.74 8.87 5.04 12 5.04z" />
                 <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43c-.28 1.44-1.09 2.67-2.31 3.49l3.6 2.79c2.1-1.94 3.77-5.17 3.77-8.43z" />
@@ -229,13 +282,7 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
               <span>Continue with Google</span>
             </button>
 
-            <button
-              onClick={() => {
-                setMode(mode === "sign-in" ? "sign-up" : "sign-in");
-                setMessage("");
-              }}
-              className="auth-switch-btn"
-            >
+            <button onClick={switchMode} className="auth-switch-btn">
               {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
             </button>
           </div>

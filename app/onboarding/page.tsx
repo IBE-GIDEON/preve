@@ -1,14 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { completeOnboarding } from "./actions";
 
 type OnboardingState = "welcome" | "connect" | "complete";
 
 export default function OnboardingPage() {
   const [step, setStep] = useState<OnboardingState>("welcome");
+  const [finishing, setFinishing] = useState(false);
   const router = useRouter();
+
+  // Persist onboarding completion on the account, then move on. Runs on any
+  // exit (import or skip) so returning users never see onboarding again.
+  const finishOnboarding = useCallback(
+    async (target: string) => {
+      if (finishing) return;
+      setFinishing(true);
+      await completeOnboarding();
+      router.push(target);
+      router.refresh();
+    },
+    [finishing, router],
+  );
 
   useEffect(() => {
     if (step !== "welcome") return;
@@ -18,9 +33,9 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (step !== "complete") return;
-    const timer = window.setTimeout(() => router.push("/dashboard/imports"), 900);
+    const timer = window.setTimeout(() => finishOnboarding("/dashboard/imports"), 900);
     return () => window.clearTimeout(timer);
-  }, [step, router]);
+  }, [step, finishOnboarding]);
 
   return (
     <div className="app-container" style={{ alignItems: "center", justifyContent: "center" }}>
@@ -57,7 +72,7 @@ export default function OnboardingPage() {
                 onClick={() => setStep("complete")}
                 style={{
                   padding: "1.5rem",
-                  border: "1px solid rgba(0,0,0,0.1)",
+                  border: "1px solid var(--input-border)",
                   borderRadius: "12px",
                   background: "var(--background)",
                   color: "var(--foreground)",
@@ -77,10 +92,11 @@ export default function OnboardingPage() {
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => router.push("/dashboard")}
+                onClick={() => finishOnboarding("/dashboard")}
+                disabled={finishing}
                 style={{
                   padding: "1.5rem",
-                  border: "1px solid rgba(0,0,0,0.1)",
+                  border: "1px solid var(--input-border)",
                   borderRadius: "12px",
                   background: "var(--background)",
                   color: "var(--foreground)",
@@ -108,7 +124,7 @@ export default function OnboardingPage() {
             style={{
               textAlign: "center",
               padding: "3rem",
-              border: "1px solid rgba(0,0,0,0.1)",
+              border: "1px solid var(--input-border)",
               borderRadius: "16px",
               background: "var(--background)",
             }}
