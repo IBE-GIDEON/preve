@@ -49,12 +49,36 @@ export async function updateSession(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/auth";
     redirectUrl.searchParams.set("next", getSafeRedirectPath(`${pathname}${request.nextUrl.search}`));
-    return NextResponse.redirect(redirectUrl);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {
+        path: cookie.path,
+        domain: cookie.domain,
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite,
+        expires: cookie.expires,
+        maxAge: cookie.maxAge,
+      });
+    });
+    return redirectResponse;
   }
 
   if ((pathname === "/auth" || pathname.startsWith("/auth/")) && hasValidUser) {
     const redirectUrl = new URL(getSafeRedirectPath(request.nextUrl.searchParams.get("next")), request.nextUrl.origin);
-    return NextResponse.redirect(redirectUrl);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    response.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value, {
+        path: cookie.path,
+        domain: cookie.domain,
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        sameSite: cookie.sameSite,
+        expires: cookie.expires,
+        maxAge: cookie.maxAge,
+      });
+    });
+    return redirectResponse;
   }
 
   return response;
