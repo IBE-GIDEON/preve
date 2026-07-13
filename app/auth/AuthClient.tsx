@@ -7,9 +7,13 @@ import { FormEvent, useMemo, useState } from "react";
 import ThemeToggle from "../../components/ThemeToggle";
 import { getSafeRedirectPath } from "../../lib/auth/redirect";
 import { createClient } from "../../lib/supabase/client";
-import { hasSupabasePublicEnv, isLocalPreviewAuthBypassEnabled } from "../../lib/supabase/env";
 
 type AuthMode = "sign-in" | "sign-up";
+
+interface AuthClientProps {
+  configured: boolean;
+  bypass: boolean;
+}
 
 function getErrorCopy(code: string | null) {
   if (code === "auth_not_configured") {
@@ -21,11 +25,9 @@ function getErrorCopy(code: string | null) {
   return "";
 }
 
-export default function AuthClient() {
+export default function AuthClient({ configured, bypass }: AuthClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const configured = hasSupabasePublicEnv();
-  const bypass = isLocalPreviewAuthBypassEnabled();
   const isBypassActive = !configured && bypass;
   
   const nextPath = getSafeRedirectPath(searchParams.get("next"), "/onboarding");
@@ -35,7 +37,15 @@ export default function AuthClient() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(getErrorCopy(searchParams.get("error")));
   const [loading, setLoading] = useState(false);
-  const supabase = useMemo(() => (configured ? createClient() : null), [configured]);
+  const supabase = useMemo(() => {
+    if (!configured) return null;
+
+    try {
+      return createClient();
+    } catch {
+      return null;
+    }
+  }, [configured]);
 
   async function handlePasswordAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,8 +123,6 @@ export default function AuthClient() {
     }
   }
 
-  const isFormActive = configured || isBypassActive;
-
   return (
     <div className="app-container" style={{ flexDirection: "column" }}>
       <header style={{ padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -184,7 +192,7 @@ export default function AuthClient() {
                 placeholder="Email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                disabled={!isFormActive || loading}
+                disabled={loading}
                 className="auth-input"
               />
               <input
@@ -194,11 +202,11 @@ export default function AuthClient() {
                 placeholder="Password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                disabled={!isFormActive || loading}
+                disabled={loading}
                 className="auth-input"
               />
               <button 
-                disabled={!isFormActive || loading} 
+                disabled={loading} 
                 className="auth-primary-btn"
               >
                 {loading ? "Working..." : mode === "sign-in" ? "Sign in" : "Create account"}
@@ -207,7 +215,7 @@ export default function AuthClient() {
 
             <button
               onClick={handleGoogleAuth}
-              disabled={!isFormActive || loading}
+              disabled={loading}
               className="auth-google-btn"
             >
               <svg style={{ width: "16px", height: "16px", flexShrink: 0 }} viewBox="0 0 24 24">
