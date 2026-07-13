@@ -2950,10 +2950,8 @@ body {
 }
 
 .legacy-landing-shell,
-.landing-section,
 .landing-final-section,
-.landing-footer,
-.landing-footer-container {
+.landing-footer {
   max-width: 100%;
 }
 
