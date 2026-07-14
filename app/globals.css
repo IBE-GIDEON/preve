@@ -2637,6 +2637,187 @@ img.settings-avatar {
   white-space: nowrap;
 }
 
+/* Collections */
+.collections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.collection-card {
+  display: block;
+  text-decoration: none;
+  color: var(--foreground);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 16px;
+  padding: 1.25rem;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.collection-card:hover {
+  border-color: color-mix(in srgb, var(--foreground) 25%, transparent);
+  transform: translateY(-2px);
+}
+
+.collection-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+
+.collection-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+.collection-badge {
+  border: 1px solid var(--input-border);
+  border-radius: 9999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  opacity: 0.85;
+}
+
+.collection-picker {
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.collection-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 0.9rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--input-border);
+  color: var(--foreground);
+  cursor: pointer;
+  font: inherit;
+}
+
+.collection-picker-row:last-child {
+  border-bottom: none;
+}
+
+.collection-picker-row:hover {
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+
+.collection-picker-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.collection-plat {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 58px;
+}
+
+.collection-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 0.8rem 0.9rem;
+}
+
+.collection-item-text {
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.collection-remove:hover {
+  opacity: 1;
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #ef4444;
+}
+
+/* Library / workspace hub */
+.library-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.library-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.library-stats strong {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.library-stats span {
+  font-size: 0.8rem;
+  opacity: 0.55;
+}
+
+.library-history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.25rem;
+  border-bottom: 1px solid var(--input-border);
+  color: var(--foreground);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.library-history-row:last-child {
+  border-bottom: none;
+}
+
+.library-history-row:hover {
+  opacity: 0.75;
+}
+
 .header-search {
   justify-self: center;
   width: 100%;

@@ -3,6 +3,7 @@
 import {
   Bookmark,
   DownloadCloud,
+  FolderOpen,
   Home,
   Link2,
   Search,
@@ -20,6 +21,7 @@ const NAV_ITEMS: Array<{
 }> = [
   { label: "Home", href: "/dashboard", icon: Home, exact: true },
   { label: "Search", href: "/dashboard/search", icon: Search },
+  { label: "Collections", href: "/dashboard/collections", icon: FolderOpen },
   { label: "Imports", href: "/dashboard/imports", icon: DownloadCloud },
   { label: "Accounts", href: "/dashboard/accounts", icon: Link2 },
   { label: "Saved", href: "/dashboard/saved", icon: Bookmark },

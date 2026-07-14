@@ -19,6 +19,7 @@ import {
   saveSearchQuery,
   type PreveState,
 } from "../lib/preveState";
+import { recordSearch } from "../../lib/workspace/client";
 import {
   getArchiveStats,
   getSimilarArchivePosts,
@@ -100,6 +101,7 @@ export default function DashboardPage() {
 
     const timeout = window.setTimeout(() => {
       updatePreveState((state) => saveSearchQuery(state, cleanQuery));
+      void recordSearch(cleanQuery);
     }, 900);
 
     return () => window.clearTimeout(timeout);

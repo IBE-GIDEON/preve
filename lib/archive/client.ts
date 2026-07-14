@@ -6,7 +6,7 @@ import { createClient } from "../supabase/client";
 type DbPlatform = "reddit" | "x" | "linkedin";
 type DbKind = "post" | "comment" | "thread" | "article";
 
-interface ArchiveItemRow {
+export interface ArchiveItemRow {
   id: string;
   platform: DbPlatform;
   kind: DbKind;
@@ -19,6 +19,10 @@ interface ArchiveItemRow {
   published_at: string | null;
   created_at: string;
 }
+
+/** Column list for selecting an archive item row (shared across features). */
+export const ARCHIVE_ITEM_COLUMNS =
+  "id, platform, kind, source_title, body, url, topics, summary, engagement, published_at, created_at";
 
 export interface ArchiveLoadResult {
   posts: Post[];
@@ -105,7 +109,7 @@ function splitImportText(rawText: string) {
     .filter(Boolean);
 }
 
-function postFromRow(row: ArchiveItemRow): Post {
+export function postFromRow(row: ArchiveItemRow): Post {
   return {
     id: row.id,
     platform: platformFromDb[row.platform],
@@ -137,7 +141,7 @@ export async function loadArchivePosts(): Promise<ArchiveLoadResult> {
   const [{ data: archiveItems, error: archiveError }, { data: savedItems, error: savedError }] = await Promise.all([
     supabase
       .from("archive_items")
-      .select("id, platform, kind, source_title, body, url, topics, summary, engagement, published_at, created_at")
+      .select(ARCHIVE_ITEM_COLUMNS)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase.from("saved_archive_items").select("archive_item_id"),
