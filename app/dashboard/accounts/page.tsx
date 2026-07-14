@@ -3,29 +3,15 @@
 import { motion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PlatformIcon } from "../../../components/PlatformIcon";
+import { CONNECT_PLATFORMS } from "../../../lib/connect-platforms";
 import {
   connectAccount,
   disconnectAccount,
   listConnectedAccounts,
   syncAccount,
-  type AccountPlatform,
   type ConnectedAccountMap,
 } from "../../../lib/accounts/client";
-
-interface PlatformMeta {
-  id: AccountPlatform;
-  name: string;
-  color: string;
-  mark: string;
-  handlePrefix: string;
-  ready: boolean;
-}
-
-const PLATFORMS: PlatformMeta[] = [
-  { id: "reddit", name: "Reddit", color: "#FF4500", mark: "r", handlePrefix: "u/", ready: true },
-  { id: "x", name: "X", color: "#0f1419", mark: "X", handlePrefix: "@", ready: false },
-  { id: "linkedin", name: "LinkedIn", color: "#0A66C2", mark: "in", handlePrefix: "", ready: false },
-];
 
 const STATUS_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   connected: { label: "Connected", color: "#16a34a", bg: "rgba(22,163,74,0.12)" },
@@ -46,12 +32,10 @@ function lastSyncLabel(iso: string | null) {
 }
 
 export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<ConnectedAccountMap>({ reddit: null, x: null, linkedin: null });
+  const [accounts, setAccounts] = useState<ConnectedAccountMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [connecting, setConnecting] = useState<AccountPlatform | null>(null);
-  const [handle, setHandle] = useState("");
-  const [busy, setBusy] = useState<AccountPlatform | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -69,7 +53,7 @@ export default function AccountsPage() {
     }
   }
 
-  async function run(platform: AccountPlatform, action: () => Promise<void>) {
+  async function run(platform: string, action: () => Promise<void>) {
     setBusy(platform);
     setError("");
     try {
@@ -82,21 +66,15 @@ export default function AccountsPage() {
     }
   }
 
-  async function handleConnect(platform: AccountPlatform) {
-    await run(platform, () => connectAccount(platform, handle));
-    setConnecting(null);
-    setHandle("");
-  }
-
   return (
     <div className="dashboard-content-area">
       <main className="dashboard-main" style={{ paddingTop: "3rem", alignItems: "flex-start" }}>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          style={{ width: "100%", maxWidth: "680px", margin: "0 auto" }}>
+          style={{ width: "100%", maxWidth: "760px", margin: "0 auto" }}>
           <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "0.4rem" }}>Connected accounts</h1>
           <p className="settings-muted" style={{ marginBottom: "1.5rem" }}>
-            Link the platforms you publish on. Connections are simulated for now — real OAuth sync is
-            coming, but you can manage the connection state today.
+            Connect the platforms you publish on. Connections are simulated for now — real OAuth sync
+            is coming per platform, but you can manage connection state today.
           </p>
 
           {error && <p className="auth-field-error" style={{ marginBottom: "1rem" }}>{error}</p>}
@@ -104,76 +82,58 @@ export default function AccountsPage() {
           {loading ? (
             <p className="settings-muted">Loading accounts…</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {PLATFORMS.map((platform) => {
+            <div className="connect-grid">
+              {CONNECT_PLATFORMS.map((platform) => {
                 const account = accounts[platform.id];
-                const isConnected = account?.status === "connected" || account?.status === "importing";
-                const status = STATUS_STYLES[account?.status ?? "disconnected"];
+                const connected = account?.status === "connected" || account?.status === "importing";
+                const status = account ? STATUS_STYLES[account.status] : null;
                 const isBusy = busy === platform.id;
 
                 return (
-                  <section key={platform.id} className="account-card">
-                    <div className="account-card-head">
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
-                        <span className="account-mark" style={{ background: platform.color }}>{platform.mark}</span>
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <span style={{ fontWeight: 600, fontSize: "1.05rem" }}>{platform.name}</span>
-                            {!platform.ready && <span className="account-soon">OAuth soon</span>}
-                          </div>
-                          <div className="settings-muted" style={{ fontSize: "0.85rem" }}>
-                            {isConnected
-                              ? `${account?.handle ? `${platform.handlePrefix}${account.handle} · ` : ""}${lastSyncLabel(account?.lastSyncAt ?? null)}`
+                  <section key={platform.id} className="connect-card">
+                    <div className="connect-card-main">
+                      <span className="connect-icon" style={{ background: `#${platform.icon.hex}` }}>
+                        <PlatformIcon icon={platform.icon} color="#ffffff" size={20} title={platform.label} />
+                      </span>
+                      <div className="connect-card-info">
+                        <div className="connect-card-name">
+                          {platform.label}
+                          {!platform.ready && <span className="account-soon">Soon</span>}
+                        </div>
+                        <div className="settings-muted connect-card-sub">
+                          {connected
+                            ? `${account?.handle ? `${platform.handlePrefix}${account.handle} · ` : ""}${lastSyncLabel(account?.lastSyncAt ?? null)}`
+                            : status
+                              ? "Disconnected"
                               : "Not connected"}
-                          </div>
                         </div>
                       </div>
-                      <span className="account-status" style={{ color: status.color, background: status.bg }}>
-                        {status.label}
-                      </span>
+                      {status && (
+                        <span className="account-status" style={{ color: status.color, background: status.bg }}>
+                          {status.label}
+                        </span>
+                      )}
                     </div>
 
-                    {connecting === platform.id ? (
-                      <div className="account-connect-row">
-                        <div className="profile-username" style={{ flex: 1 }}>
-                          {platform.handlePrefix && <span className="profile-username-at">{platform.handlePrefix}</span>}
-                          <input
-                            className="auth-input"
-                            style={platform.handlePrefix ? undefined : { paddingLeft: "1rem" }}
-                            value={handle}
-                            onChange={(e) => setHandle(e.target.value)}
-                            placeholder="your handle"
-                            autoFocus
-                          />
-                        </div>
-                        <button className="settings-save-btn" style={{ height: "40px" }}
-                          onClick={() => handleConnect(platform.id)} disabled={isBusy}>
-                          {isBusy ? "..." : "Connect"}
-                        </button>
-                        <button className="settings-ghost-btn" onClick={() => { setConnecting(null); setHandle(""); }}>
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="account-actions">
-                        {isConnected ? (
-                          <>
-                            <button className="settings-ghost-btn" disabled={isBusy}
-                              onClick={() => run(platform.id, () => syncAccount(platform.id))}>
-                              <RefreshCw size={14} className={isBusy ? "spin" : undefined} /> Sync now
-                            </button>
-                            <button className="settings-ghost-btn danger" disabled={isBusy}
-                              onClick={() => run(platform.id, () => disconnectAccount(platform.id))}>
-                              Disconnect
-                            </button>
-                          </>
-                        ) : (
-                          <button className="settings-ghost-btn" onClick={() => { setConnecting(platform.id); setHandle(account?.handle ?? ""); }}>
-                            Connect
+                    <div className="connect-card-actions">
+                      {connected ? (
+                        <>
+                          <button className="settings-ghost-btn" disabled={isBusy}
+                            onClick={() => run(platform.id, () => syncAccount(platform.id))}>
+                            <RefreshCw size={14} className={isBusy ? "spin" : undefined} /> Sync
                           </button>
-                        )}
-                      </div>
-                    )}
+                          <button className="settings-ghost-btn danger" disabled={isBusy}
+                            onClick={() => run(platform.id, () => disconnectAccount(platform.id))}>
+                            Disconnect
+                          </button>
+                        </>
+                      ) : (
+                        <button className="settings-ghost-btn" disabled={isBusy}
+                          onClick={() => run(platform.id, () => connectAccount(platform.id, account?.handle ?? ""))}>
+                          {isBusy ? "Connecting..." : "Connect"}
+                        </button>
+                      )}
+                    </div>
                   </section>
                 );
               })}

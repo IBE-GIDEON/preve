@@ -2819,39 +2819,61 @@ img.settings-avatar {
 }
 
 /* Connected accounts */
-.account-card {
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
-  border-radius: 16px;
-  padding: 1.25rem 1.4rem;
-}
-
-.account-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.connect-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1rem;
 }
 
-.account-mark {
+.connect-card {
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  border-radius: 16px;
+  padding: 1.1rem 1.2rem;
+}
+
+.connect-card-main {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.connect-icon {
   flex-shrink: 0;
   width: 42px;
   height: 42px;
-  border-radius: 10px;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.15rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.connect-card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.connect-card-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.connect-card-sub {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .account-soon {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 0.1rem 0.45rem;
+  padding: 0.1rem 0.4rem;
   border-radius: 9999px;
   border: 1px solid var(--input-border);
   opacity: 0.7;
@@ -2859,23 +2881,16 @@ img.settings-avatar {
 
 .account-status {
   flex-shrink: 0;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 0.25rem 0.7rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 9999px;
 }
 
-.account-actions {
+.connect-card-actions {
   display: flex;
-  gap: 0.6rem;
-  margin-top: 1.1rem;
-}
-
-.account-connect-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 1.1rem;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
 }
 
 /* Public profile / community pages */

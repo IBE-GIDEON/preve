@@ -2,7 +2,8 @@
 
 import { createClient } from "../supabase/client";
 
-export type AccountPlatform = "reddit" | "x" | "linkedin";
+/** Any platform id from the connect registry (no longer a fixed union). */
+export type AccountPlatform = string;
 export type AccountStatus = "connected" | "disconnected" | "importing" | "error";
 
 export interface ConnectedAccount {
@@ -12,7 +13,8 @@ export interface ConnectedAccount {
   lastSyncAt: string | null;
 }
 
-export type ConnectedAccountMap = Record<AccountPlatform, ConnectedAccount | null>;
+/** Keyed by platform id; only platforms with an existing row are present. */
+export type ConnectedAccountMap = Record<string, ConnectedAccount>;
 
 interface AccountRow {
   platform: AccountPlatform;
@@ -35,7 +37,7 @@ export async function listConnectedAccounts(): Promise<ConnectedAccountMap> {
     .select("platform, status, platform_username, last_sync_at");
   if (error) throw new Error(error.message);
 
-  const map: ConnectedAccountMap = { reddit: null, x: null, linkedin: null };
+  const map: ConnectedAccountMap = {};
   for (const row of (data ?? []) as AccountRow[]) {
     map[row.platform] = {
       platform: row.platform,
