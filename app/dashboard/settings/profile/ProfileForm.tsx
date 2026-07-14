@@ -248,6 +248,14 @@ export default function ProfileForm({ userId, initial }: { userId: string; initi
                 <span className="profile-switch-knob" />
               </button>
             </div>
+            {isPublic && username.trim() && (
+              <p className="settings-muted" style={{ marginTop: "0.9rem" }}>
+                Public profile:{" "}
+                <Link href={`/u/${username.trim().toLowerCase()}`} className="auth-inline-link">
+                  /u/{username.trim().toLowerCase()}
+                </Link>
+              </p>
+            )}
           </section>
 
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
