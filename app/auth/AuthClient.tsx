@@ -1,11 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
-import ThemeToggle from "../../components/ThemeToggle";
+import AuthShell from "./AuthShell";
 import { getSafeRedirectPath } from "../../lib/auth/redirect";
 import { authErrorCodeCopy, friendlyAuthError } from "../../lib/auth/error-messages";
 import { PASSWORD_HINT, validateEmail, validatePassword, type AuthMode } from "../../lib/auth/validation";
@@ -147,66 +146,21 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
   }
 
   return (
-    <div className="app-container" style={{ flexDirection: "column" }}>
-      <header style={{ padding: "1.5rem 2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Link href="/" className="logo" style={{ marginBottom: 0, textDecoration: "none" }}>
-          <img src="/images/preve-search-mark.svg" alt="" className="logo-mark" />
-          <span>preve</span>
-        </Link>
-        <ThemeToggle />
-      </header>
+    <AuthShell
+      title={mode === "sign-in" ? "Sign in to preve" : "Create your account"}
+      subtitle={
+        mode === "sign-in"
+          ? "Access your private archive and connected social sources."
+          : "Start with a real account before importing your archive."
+      }
+    >
+      {banner && (
+        <div className={`auth-alert ${banner.type}`} role={banner.type === "error" ? "alert" : "status"}>
+          {banner.text}
+        </div>
+      )}
 
-      <main
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "0 2rem 4rem",
-        }}
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          style={{ width: "100%", maxWidth: "400px" }}
-        >
-          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-            <h1
-              style={{
-                fontSize: "2.4rem",
-                fontFamily: "'Newsreader', Georgia, serif",
-                fontWeight: 500,
-                letterSpacing: "-0.01em",
-                marginBottom: "0.75rem",
-              }}
-            >
-              {mode === "sign-in" ? "Sign in to preve" : "Create your account"}
-            </h1>
-            <p style={{ opacity: 0.6, fontSize: "0.95rem", lineHeight: 1.5 }}>
-              {mode === "sign-in"
-                ? "Access your private archive and connected social sources."
-                : "Start with a real account before importing your archive."}
-            </p>
-          </div>
-
-          <div
-            style={{
-              border: "1px solid var(--input-border)",
-              borderRadius: "16px",
-              background: "var(--input-bg)",
-              padding: "1.5rem",
-              boxShadow: "0 10px 30px rgba(0, 0, 0, 0.015)",
-            }}
-          >
-            {banner && (
-              <div className={`auth-alert ${banner.type}`} role={banner.type === "error" ? "alert" : "status"}>
-                {banner.text}
-              </div>
-            )}
-
-            <form onSubmit={handlePasswordAuth} noValidate style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+      <form onSubmit={handlePasswordAuth} noValidate style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
               <div>
                 <input
                   type="email"
@@ -267,6 +221,14 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
                 ) : null}
               </div>
 
+              {mode === "sign-in" && (
+                <div style={{ textAlign: "right", marginTop: "-0.3rem" }}>
+                  <Link href="/auth/reset" className="auth-inline-link">
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
+
               <button disabled={loading} className="auth-primary-btn">
                 {loading ? "Working..." : mode === "sign-in" ? "Sign in" : "Create account"}
               </button>
@@ -285,9 +247,6 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
             <button onClick={switchMode} className="auth-switch-btn">
               {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
             </button>
-          </div>
-        </motion.div>
-      </main>
-    </div>
+    </AuthShell>
   );
 }

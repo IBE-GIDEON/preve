@@ -2726,6 +2726,19 @@ body {
   text-align: left;
 }
 
+.auth-inline-link {
+  font-size: 0.85rem;
+  color: var(--foreground);
+  opacity: 0.6;
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.auth-inline-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
 [data-theme='dark'] .auth-field-error {
   color: #ef4444;
 }

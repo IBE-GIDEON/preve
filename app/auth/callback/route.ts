@@ -6,6 +6,7 @@ import { hasSupabasePublicEnv } from "../../../lib/supabase/env";
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const type = requestUrl.searchParams.get("type");
   const next = getSafeRedirectPath(requestUrl.searchParams.get("next"));
 
   if (!hasSupabasePublicEnv()) {
@@ -20,7 +21,10 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
+      // Password recovery lands on a dedicated "set new password" screen.
+      // (getSafeRedirectPath intentionally refuses /auth/* as a `next` target.)
+      const destination = type === "recovery" ? "/auth/update-password" : next;
+      return NextResponse.redirect(new URL(destination, requestUrl.origin));
     }
   }
 
