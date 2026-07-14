@@ -1,3 +1,4 @@
+import { hasServiceRoleKey } from "../../../lib/supabase/admin";
 import { hasSupabasePublicEnv } from "../../../lib/supabase/env";
 import { createClient } from "../../../lib/supabase/server";
 import SettingsView, { type SettingsAccount } from "./SettingsView";
@@ -29,5 +30,5 @@ export default async function SettingsPage() {
     }
   }
 
-  return <SettingsView account={account} />;
+  return <SettingsView account={account} canDeleteAccount={hasServiceRoleKey()} />;
 }
