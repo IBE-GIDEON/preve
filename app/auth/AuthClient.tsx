@@ -98,12 +98,26 @@ export default function AuthClient({ bypass, supabaseEnv }: AuthClientProps) {
       return;
     }
 
-    if (mode === "sign-up" && !result.data.session) {
-      setBanner({
-        type: "info",
-        text: "Almost there — check your email to confirm your account, then sign in.",
-      });
-      return;
+    if (mode === "sign-up") {
+      // Supabase hides "email already registered" behind a normal-looking
+      // response (to prevent email enumeration): a user with an empty
+      // `identities` array and no session. Detect that and say so clearly.
+      const alreadyRegistered = result.data.user?.identities?.length === 0;
+      if (alreadyRegistered) {
+        setBanner({
+          type: "error",
+          text: "An account with that email already exists. Try signing in instead.",
+        });
+        return;
+      }
+
+      if (!result.data.session) {
+        setBanner({
+          type: "info",
+          text: "Almost there — check your email to confirm your account, then sign in.",
+        });
+        return;
+      }
     }
 
     router.push(nextPath);
