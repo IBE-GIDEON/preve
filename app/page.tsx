@@ -165,7 +165,7 @@ export default function LandingPage() {
 
         <header className="legacy-landing-header" style={{ position: 'relative', zIndex: 10 }}>
           <div className="logo" style={{ marginBottom: 0 }}>
-            <img src="/images/preve-search-mark.svg" alt="" className="logo-mark" />
+            <img src="/images/preve-search-mark.png" alt="" className="logo-mark" />
             <span>preve</span>
           </div>
           <ThemeToggle />
@@ -352,7 +352,7 @@ export default function LandingPage() {
         <div className="landing-footer-container">
           <div className="footer-brand">
             <div className="logo">
-              <img src="/images/preve-search-mark.svg" alt="" className="logo-mark" />
+              <img src="/images/preve-search-mark.png" alt="" className="logo-mark" />
               <span>preve</span>
             </div>
             <p>

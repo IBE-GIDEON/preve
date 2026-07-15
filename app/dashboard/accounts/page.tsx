@@ -31,14 +31,31 @@ function lastSyncLabel(iso: string | null) {
   return `Synced ${Math.round(hours / 24)}d ago`;
 }
 
+const OAUTH_NOTICES: Record<string, { type: "ok" | "error"; text: string }> = {
+  "connected=reddit": { type: "ok", text: "Reddit connected. Your import will run next." },
+  "error=reddit_not_configured": { type: "error", text: "Reddit isn't configured on the server yet." },
+  "error=reddit_denied": { type: "error", text: "Reddit connection was cancelled." },
+  "error=reddit_state": { type: "error", text: "That connection attempt expired. Please try again." },
+  "error=reddit_failed": { type: "error", text: "Couldn't connect Reddit. Please try again." },
+  "error=reddit_save": { type: "error", text: "Connected, but we couldn't save it. Please try again." },
+};
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<ConnectedAccountMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     void load();
+    // Surface the OAuth callback result, then clean the URL.
+    const query = window.location.search.replace(/^\?/, "");
+    const match = OAUTH_NOTICES[query];
+    if (match) {
+      setNotice(match);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
 
   async function load() {
@@ -77,6 +94,11 @@ export default function AccountsPage() {
             is coming per platform, but you can manage connection state today.
           </p>
 
+          {notice && (
+            <p className={`settings-status ${notice.type}`} role="status" style={{ marginBottom: "1rem" }}>
+              {notice.text}
+            </p>
+          )}
           {error && <p className="auth-field-error" style={{ marginBottom: "1rem" }}>{error}</p>}
 
           {loading ? (
@@ -129,8 +151,14 @@ export default function AccountsPage() {
                         </>
                       ) : (
                         <button className="settings-ghost-btn" disabled={isBusy}
-                          onClick={() => run(platform.id, () => connectAccount(platform.id, account?.handle ?? ""))}>
-                          {isBusy ? "Connecting..." : "Connect"}
+                          onClick={() => {
+                            if (platform.oauthStart) {
+                              window.location.assign(platform.oauthStart);
+                              return;
+                            }
+                            run(platform.id, () => connectAccount(platform.id, account?.handle ?? ""));
+                          }}>
+                          {isBusy ? "Connecting..." : platform.oauthStart ? "Connect Reddit" : "Connect"}
                         </button>
                       )}
                     </div>

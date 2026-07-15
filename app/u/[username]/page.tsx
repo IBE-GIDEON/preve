@@ -63,7 +63,7 @@ export default async function PublicProfilePage({
     <div className="public-page">
       <header className="public-header">
         <Link href="/" className="logo" style={{ marginBottom: 0, textDecoration: "none" }}>
-          <img src="/images/preve-search-mark.svg" alt="" className="logo-mark" />
+          <img src="/images/preve-search-mark.png" alt="" className="logo-mark" />
           <span>preve</span>
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
