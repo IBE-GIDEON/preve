@@ -2993,6 +2993,50 @@ img.settings-avatar {
   gap: 1.25rem;
 }
 
+/* Search filters */
+.search-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.search-filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--foreground);
+  border-radius: 9999px;
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.search-filter-select:focus {
+  border-color: var(--accent);
+}
+
+.search-filter-clear {
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  opacity: 0.6;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  transition: opacity 0.2s ease;
+}
+
+.search-filter-clear:hover {
+  opacity: 1;
+}
+
 .header-search {
   justify-self: center;
   width: 100%;

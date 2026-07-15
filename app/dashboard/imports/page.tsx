@@ -6,6 +6,7 @@ import type { Platform, Post, PostKind } from "../../data/mockPosts";
 import { getPlatformColor } from "../../data/mockPosts";
 import { PLATFORM_ORDER } from "../../lib/preveState";
 import { getArchiveStats, importManualArchive, loadArchivePosts } from "../../../lib/archive/client";
+import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 
 const KIND_OPTIONS: PostKind[] = ["Post", "Comment", "Thread", "Article"];
 
@@ -41,6 +42,23 @@ function countImportItems(rawText: string) {
     .filter(Boolean).length;
 }
 
+function jobStatusLabel(status: ImportJob["status"]) {
+  return { queued: "Queued", running: "Importing", completed: "Completed", failed: "Failed" }[status];
+}
+
+function jobStatusColor(status: ImportJob["status"]) {
+  return { queued: "var(--foreground)", running: "#d97706", completed: "#16a34a", failed: "#ef4444" }[status];
+}
+
+function importAgo(iso: string) {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 export default function ImportsPage() {
   const [archivePosts, setArchivePosts] = useState<Post[]>([]);
   const [platform, setPlatform] = useState<Platform>("Reddit");
@@ -50,6 +68,7 @@ export default function ImportsPage() {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
@@ -65,6 +84,7 @@ export default function ImportsPage() {
       setLoading(true);
       const result = await loadArchivePosts();
       setArchivePosts(result.posts);
+      getRecentImportJobs().then(setImportJobs).catch(() => {});
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Could not load your archive.");
     } finally {
@@ -295,9 +315,37 @@ export default function ImportsPage() {
               <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{connectedPlatforms}</div>
             </div>
             <div style={{ opacity: 0.65, lineHeight: 1.5 }}>
-              Manual imports are stored in your private Supabase archive and become searchable from the dashboard.
+              Imports are stored in your private Supabase archive and become searchable from the dashboard.
             </div>
           </div>
+
+          {importJobs.length > 0 && (
+            <div style={{ marginTop: "2rem" }}>
+              <h3 className="suggestions-heading" style={{ marginBottom: "1rem" }}>Recent imports</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                {importJobs.map((job) => (
+                  <div key={job.id} style={{ fontSize: "0.85rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+                      <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{job.platform}</span>
+                      <span style={{ color: jobStatusColor(job.status), fontWeight: 600 }}>
+                        {jobStatusLabel(job.status)}
+                      </span>
+                    </div>
+                    <div style={{ opacity: 0.55, marginTop: "0.15rem" }}>
+                      {job.status === "failed"
+                        ? job.error ?? "Import failed"
+                        : `${formatNumber(job.importedItems)} items`}
+                      {job.completedAt
+                        ? ` · ${importAgo(job.completedAt)}`
+                        : job.startedAt
+                          ? ` · ${importAgo(job.startedAt)}`
+                          : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </aside>
     </div>

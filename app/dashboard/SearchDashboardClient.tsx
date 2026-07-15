@@ -8,6 +8,7 @@ import {
   getPlatformColor,
   type Platform,
   type Post,
+  type PostKind,
   searchPosts,
 } from "../data/mockPosts";
 import {
@@ -59,6 +60,9 @@ function createLinkedInRewrite(post: Post) {
 
 export default function DashboardPage() {
   const [searchValue, setSearchValue] = useState("");
+  const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
+  const [filterKind, setFilterKind] = useState<PostKind | "all">("all");
+  const [filterDays, setFilterDays] = useState<"all" | "7" | "30" | "90" | "365">("all");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copied, setCopied] = useState(false);
@@ -175,7 +179,19 @@ export default function DashboardPage() {
     visibleSuggestions.push(SUGGESTIONS[(currentIndex + i) % SUGGESTIONS.length]);
   }
 
-  const searchResults = useMemo(() => searchPosts(searchValue, archivePosts), [searchValue, archivePosts]);
+  const searchResults = useMemo(() => {
+    let results = searchPosts(searchValue, archivePosts);
+    if (filterPlatform !== "all") results = results.filter((post) => post.platform === filterPlatform);
+    if (filterKind !== "all") results = results.filter((post) => post.kind === filterKind);
+    if (filterDays !== "all") {
+      const cutoff = Date.now() - Number(filterDays) * 86_400_000;
+      results = results.filter((post) => post.publishedAt && new Date(post.publishedAt).getTime() >= cutoff);
+    }
+    return results;
+  }, [searchValue, archivePosts, filterPlatform, filterKind, filterDays]);
+
+  const activeFilterCount =
+    (filterPlatform !== "all" ? 1 : 0) + (filterKind !== "all" ? 1 : 0) + (filterDays !== "all" ? 1 : 0);
   const resultTopics = Array.from(new Set(searchResults.flatMap((post) => post.topics))).slice(0, 5);
   const resultPlatforms = Array.from(new Set(searchResults.map((post) => post.platform)));
   const totals = getArchiveStats(archivePosts);
@@ -303,6 +319,56 @@ export default function DashboardPage() {
               exit={{ opacity: 0, y: -20 }}
               style={{ width: "100%", maxWidth: "640px", marginTop: "3rem" }}
             >
+              <div className="search-filter-bar">
+                <select
+                  value={filterPlatform}
+                  onChange={(event) => setFilterPlatform(event.target.value as Platform | "all")}
+                  className="search-filter-select"
+                  aria-label="Filter by platform"
+                >
+                  <option value="all">All platforms</option>
+                  {PLATFORM_ORDER.map((platform) => (
+                    <option key={platform} value={platform}>{platform}</option>
+                  ))}
+                </select>
+                <select
+                  value={filterKind}
+                  onChange={(event) => setFilterKind(event.target.value as PostKind | "all")}
+                  className="search-filter-select"
+                  aria-label="Filter by type"
+                >
+                  <option value="all">All types</option>
+                  {(["Post", "Comment", "Thread", "Article"] as PostKind[]).map((kind) => (
+                    <option key={kind} value={kind}>{kind}</option>
+                  ))}
+                </select>
+                <select
+                  value={filterDays}
+                  onChange={(event) => setFilterDays(event.target.value as "all" | "7" | "30" | "90" | "365")}
+                  className="search-filter-select"
+                  aria-label="Filter by date"
+                >
+                  <option value="all">Any time</option>
+                  <option value="7">Past week</option>
+                  <option value="30">Past month</option>
+                  <option value="90">Past 3 months</option>
+                  <option value="365">Past year</option>
+                </select>
+                {activeFilterCount > 0 && (
+                  <button
+                    type="button"
+                    className="search-filter-clear"
+                    onClick={() => {
+                      setFilterPlatform("all");
+                      setFilterKind("all");
+                      setFilterDays("all");
+                    }}
+                  >
+                    Clear ({activeFilterCount})
+                  </button>
+                )}
+              </div>
+
               <h4 style={{ opacity: 0.5, marginBottom: "1rem" }}>
                 {searchResults.length} results for "{searchValue}"
               </h4>

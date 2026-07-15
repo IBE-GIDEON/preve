@@ -118,6 +118,7 @@ export function postFromRow(row: ArchiveItemRow): Post {
     summary: row.summary || makeSummary(row.body),
     sourceTitle: row.source_title || "Manual import",
     date: formatRelativeDate(row.published_at || row.created_at),
+    publishedAt: row.published_at || row.created_at,
     url: row.url || "",
     engagement: row.engagement || {},
     topics: row.topics?.length ? row.topics : detectTopics(row.body),

@@ -9,6 +9,8 @@ export interface Post {
   summary: string;
   sourceTitle: string;
   date: string;
+  /** Raw ISO timestamp (present on imported items; used for date filtering). */
+  publishedAt?: string;
   url: string;
   engagement: {
     likes?: number;
