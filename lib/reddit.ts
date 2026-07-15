@@ -78,3 +78,98 @@ export async function getRedditIdentity(accessToken: string): Promise<{ username
 }
 
 export { API_BASE as REDDIT_API_BASE, USER_AGENT as REDDIT_USER_AGENT };
+
+// ── Import: fetch + normalize a user's posts and comments ───────────────────
+
+export interface NormalizedItem {
+  platform_item_id: string;
+  kind: "post" | "comment";
+  source_title: string | null;
+  body: string;
+  url: string | null;
+  topics: string[];
+  engagement: { likes: number; comments: number };
+  published_at: string;
+}
+
+interface RedditData {
+  id?: string;
+  name?: string;
+  title?: string;
+  selftext?: string;
+  body?: string;
+  permalink?: string;
+  url?: string;
+  subreddit?: string;
+  score?: number;
+  num_comments?: number;
+  created_utc?: number;
+  link_title?: string;
+}
+
+async function fetchListing(accessToken: string, path: string, after?: string) {
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("limit", "100");
+  url.searchParams.set("raw_json", "1");
+  if (after) url.searchParams.set("after", after);
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": USER_AGENT },
+  });
+  if (!res.ok) throw new Error(`Reddit fetch failed (${res.status})`);
+  return (await res.json()) as { data: { after: string | null; children: { kind: string; data: RedditData }[] } };
+}
+
+function permalinkUrl(d: RedditData): string | null {
+  if (d.permalink) return `https://www.reddit.com${d.permalink}`;
+  return d.url ?? null;
+}
+
+function normalizeSubmitted(d: RedditData): NormalizedItem {
+  return {
+    platform_item_id: d.name ?? `t3_${d.id}`,
+    kind: "post",
+    source_title: d.title ?? null,
+    body: (d.selftext && d.selftext.trim()) || d.title || "",
+    url: permalinkUrl(d),
+    topics: d.subreddit ? [d.subreddit] : [],
+    engagement: { likes: d.score ?? 0, comments: d.num_comments ?? 0 },
+    published_at: new Date((d.created_utc ?? 0) * 1000).toISOString(),
+  };
+}
+
+function normalizeComment(d: RedditData): NormalizedItem {
+  return {
+    platform_item_id: d.name ?? `t1_${d.id}`,
+    kind: "comment",
+    source_title: d.link_title ?? null,
+    body: d.body ?? "",
+    url: permalinkUrl(d),
+    topics: d.subreddit ? [d.subreddit] : [],
+    engagement: { likes: d.score ?? 0, comments: 0 },
+    published_at: new Date((d.created_utc ?? 0) * 1000).toISOString(),
+  };
+}
+
+/** Fetch a user's submitted posts + comments (paged, capped) and normalize. */
+export async function fetchRedditArchive(
+  accessToken: string,
+  username: string,
+  maxPagesPerType = 3,
+): Promise<NormalizedItem[]> {
+  const items: NormalizedItem[] = [];
+
+  for (const type of ["submitted", "comments"] as const) {
+    let after: string | undefined;
+    for (let page = 0; page < maxPagesPerType; page++) {
+      const listing = await fetchListing(accessToken, `/user/${username}/${type}`, after);
+      for (const child of listing.data.children) {
+        items.push(type === "submitted" ? normalizeSubmitted(child.data) : normalizeComment(child.data));
+      }
+      if (!listing.data.after) break;
+      after = listing.data.after;
+    }
+  }
+
+  return items;
+}

@@ -32,7 +32,7 @@ function lastSyncLabel(iso: string | null) {
 }
 
 const OAUTH_NOTICES: Record<string, { type: "ok" | "error"; text: string }> = {
-  "connected=reddit": { type: "ok", text: "Reddit connected. Your import will run next." },
+  "connected=reddit": { type: "ok", text: "Reddit connected — hit Import to pull in your posts & comments." },
   "error=reddit_not_configured": { type: "error", text: "Reddit isn't configured on the server yet." },
   "error=reddit_denied": { type: "error", text: "Reddit connection was cancelled." },
   "error=reddit_state": { type: "error", text: "That connection attempt expired. Please try again." },
@@ -141,8 +141,17 @@ export default function AccountsPage() {
                       {connected ? (
                         <>
                           <button className="settings-ghost-btn" disabled={isBusy}
-                            onClick={() => run(platform.id, () => syncAccount(platform.id))}>
-                            <RefreshCw size={14} className={isBusy ? "spin" : undefined} /> Sync
+                            onClick={() => run(platform.id, async () => {
+                              if (platform.id === "reddit") {
+                                const res = await fetch("/api/import/reddit", { method: "POST" });
+                                const data = await res.json().catch(() => ({}));
+                                if (!res.ok) throw new Error(data.error || "Import failed.");
+                                setNotice({ type: "ok", text: `Imported ${data.imported ?? 0} items from Reddit.` });
+                              } else {
+                                await syncAccount(platform.id);
+                              }
+                            })}>
+                            <RefreshCw size={14} className={isBusy ? "spin" : undefined} /> {platform.id === "reddit" ? "Import" : "Sync"}
                           </button>
                           <button className="settings-ghost-btn danger" disabled={isBusy}
                             onClick={() => run(platform.id, () => disconnectAccount(platform.id))}>
