@@ -11,6 +11,7 @@ import {
   type PostKind,
 } from "../data/mockPosts";
 import { searchArchive } from "../../lib/search/client";
+import { buildEmbeddings, semanticSearch } from "../../lib/semantic/client";
 import {
   addSavedSearch,
   DEFAULT_PREVE_STATE,
@@ -51,6 +52,9 @@ export default function DashboardPage() {
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
   const [filterKind, setFilterKind] = useState<PostKind | "all">("all");
   const [filterDays, setFilterDays] = useState<"all" | "7" | "30" | "90" | "365">("all");
+  const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
+  const [indexing, setIndexing] = useState(false);
+  const embeddedRef = useRef(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copied, setCopied] = useState(false);
@@ -202,7 +206,17 @@ export default function DashboardPage() {
   const [serverTotal, setServerTotal] = useState(0);
   const [serverLoading, setServerLoading] = useState(false);
 
-  // Server-side search over the whole archive (not just the first 500 loaded).
+  // Build the semantic index once when the user first switches to semantic mode.
+  useEffect(() => {
+    if (searchMode !== "semantic" || embeddedRef.current) return;
+    embeddedRef.current = true;
+    setIndexing(true);
+    buildEmbeddings()
+      .catch(() => {})
+      .finally(() => setIndexing(false));
+  }, [searchMode]);
+
+  // Search over the whole archive: keyword (Postgres) or semantic (embeddings).
   useEffect(() => {
     if (!debouncedQuery) {
       setServerResults([]);
@@ -211,16 +225,32 @@ export default function DashboardPage() {
     }
     let active = true;
     setServerLoading(true);
-    searchArchive({
-      query: debouncedQuery,
-      platform: filterPlatform,
-      kind: filterKind,
-      days: filterDays === "all" ? "all" : Number(filterDays),
-    })
+
+    const request =
+      searchMode === "semantic"
+        ? semanticSearch(debouncedQuery).then((posts) => ({ posts, total: posts.length }))
+        : searchArchive({
+            query: debouncedQuery,
+            platform: filterPlatform,
+            kind: filterKind,
+            days: filterDays === "all" ? "all" : Number(filterDays),
+          });
+
+    request
       .then((res) => {
         if (!active) return;
-        setServerResults(res.posts);
-        setServerTotal(res.total);
+        let posts = res.posts;
+        // Semantic results aren't pre-filtered, so apply filters client-side.
+        if (searchMode === "semantic") {
+          if (filterPlatform !== "all") posts = posts.filter((post) => post.platform === filterPlatform);
+          if (filterKind !== "all") posts = posts.filter((post) => post.kind === filterKind);
+          if (filterDays !== "all") {
+            const cutoff = Date.now() - Number(filterDays) * 86_400_000;
+            posts = posts.filter((post) => post.publishedAt && new Date(post.publishedAt).getTime() >= cutoff);
+          }
+        }
+        setServerResults(posts);
+        setServerTotal(searchMode === "semantic" ? posts.length : res.total);
       })
       .catch(() => {
         if (!active) return;
@@ -233,7 +263,7 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [debouncedQuery, filterPlatform, filterKind, filterDays]);
+  }, [debouncedQuery, filterPlatform, filterKind, filterDays, searchMode]);
 
   const searchResults = serverResults;
   const activeFilterCount =
@@ -260,6 +290,22 @@ export default function DashboardPage() {
             }}
             style={{ padding: "1rem 1.5rem", fontSize: "1.1rem" }}
           />
+        </div>
+
+        <div className="search-mode-row">
+          {(["keyword", "semantic"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSearchMode(mode)}
+              className={`search-mode-btn${searchMode === mode ? " active" : ""}`}
+            >
+              {mode === "semantic" ? "✨ Semantic" : "Keyword"}
+            </button>
+          ))}
+          {searchMode === "semantic" && indexing && (
+            <span className="search-mode-hint">Building semantic index…</span>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
