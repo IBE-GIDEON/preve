@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   getEngagementScore,
@@ -9,8 +9,8 @@ import {
   type Platform,
   type Post,
   type PostKind,
-  searchPosts,
 } from "../data/mockPosts";
+import { searchArchive } from "../../lib/search/client";
 import {
   addSavedSearch,
   DEFAULT_PREVE_STATE,
@@ -179,17 +179,51 @@ export default function DashboardPage() {
     visibleSuggestions.push(SUGGESTIONS[(currentIndex + i) % SUGGESTIONS.length]);
   }
 
-  const searchResults = useMemo(() => {
-    let results = searchPosts(searchValue, archivePosts);
-    if (filterPlatform !== "all") results = results.filter((post) => post.platform === filterPlatform);
-    if (filterKind !== "all") results = results.filter((post) => post.kind === filterKind);
-    if (filterDays !== "all") {
-      const cutoff = Date.now() - Number(filterDays) * 86_400_000;
-      results = results.filter((post) => post.publishedAt && new Date(post.publishedAt).getTime() >= cutoff);
-    }
-    return results;
-  }, [searchValue, archivePosts, filterPlatform, filterKind, filterDays]);
+  // Debounce the query so search-as-you-type hits the server at most every 300ms.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedQuery(searchValue.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchValue]);
 
+  const [serverResults, setServerResults] = useState<Post[]>([]);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [serverLoading, setServerLoading] = useState(false);
+
+  // Server-side search over the whole archive (not just the first 500 loaded).
+  useEffect(() => {
+    if (!debouncedQuery) {
+      setServerResults([]);
+      setServerTotal(0);
+      return;
+    }
+    let active = true;
+    setServerLoading(true);
+    searchArchive({
+      query: debouncedQuery,
+      platform: filterPlatform,
+      kind: filterKind,
+      days: filterDays === "all" ? "all" : Number(filterDays),
+    })
+      .then((res) => {
+        if (!active) return;
+        setServerResults(res.posts);
+        setServerTotal(res.total);
+      })
+      .catch(() => {
+        if (!active) return;
+        setServerResults([]);
+        setServerTotal(0);
+      })
+      .finally(() => {
+        if (active) setServerLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [debouncedQuery, filterPlatform, filterKind, filterDays]);
+
+  const searchResults = serverResults;
   const activeFilterCount =
     (filterPlatform !== "all" ? 1 : 0) + (filterKind !== "all" ? 1 : 0) + (filterDays !== "all" ? 1 : 0);
   const resultTopics = Array.from(new Set(searchResults.flatMap((post) => post.topics))).slice(0, 5);
@@ -370,10 +404,19 @@ export default function DashboardPage() {
               </div>
 
               <h4 style={{ opacity: 0.5, marginBottom: "1rem" }}>
-                {searchResults.length} results for "{searchValue}"
+                {serverLoading
+                  ? "Searching…"
+                  : `${serverTotal.toLocaleString()} result${serverTotal === 1 ? "" : "s"} for "${searchValue}"`}
+                {!serverLoading && serverTotal > searchResults.length
+                  ? ` · showing ${searchResults.length}`
+                  : ""}
               </h4>
 
-              {searchResults.length === 0 ? (
+              {serverLoading && searchResults.length === 0 ? (
+                <div style={{ textAlign: "center", opacity: 0.5, marginTop: "3rem" }}>
+                  Searching your archive…
+                </div>
+              ) : searchResults.length === 0 ? (
                 <div style={{ textAlign: "center", opacity: 0.5, marginTop: "3rem" }}>
                   No matching posts found. Import more content or try another term.
                 </div>
