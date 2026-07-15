@@ -46,18 +46,6 @@ function getPlatformLabel(platform: Platform) {
   return platform === "X" ? "X" : platform;
 }
 
-function createLinkedInRewrite(post: Post) {
-  return [
-    "A lesson worth repeating:",
-    "",
-    post.summary,
-    "",
-    post.content,
-    "",
-    `Originally from ${post.platform}. Topics: ${post.topics.join(", ")}.`,
-  ].join("\n");
-}
-
 export default function DashboardPage() {
   const [searchValue, setSearchValue] = useState("");
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
@@ -67,6 +55,8 @@ export default function DashboardPage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copied, setCopied] = useState(false);
   const [generatedRewrite, setGeneratedRewrite] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const [archivePosts, setArchivePosts] = useState<Post[]>([]);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
   const [archiveLoading, setArchiveLoading] = useState(true);
@@ -97,7 +87,29 @@ export default function DashboardPage() {
   useEffect(() => {
     setCopied(false);
     setGeneratedRewrite("");
+    setAiError("");
   }, [selectedPost?.id]);
+
+  async function runAi(action: string, format?: string) {
+    if (!selectedPost || aiLoading) return;
+    setAiLoading(true);
+    setAiError("");
+    setGeneratedRewrite("");
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, format, text: selectedPost.content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "AI request failed.");
+      setGeneratedRewrite(data.result || "");
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "AI request failed.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   useEffect(() => {
     const cleanQuery = searchValue.trim();
@@ -516,25 +528,38 @@ export default function DashboardPage() {
                 AI Actions
               </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <button onClick={() => handleCopy(generatedRewrite || selectedPost.content)} className="action-btn">
-                  {copied ? "Copied" : generatedRewrite ? "Copy Rewrite" : "Copy Content"}
+                <button onClick={() => runAi("summarize")} disabled={aiLoading} className="action-btn">
+                  {aiLoading ? "Working…" : "Summarize"}
                 </button>
-                <button onClick={() => setGeneratedRewrite(createLinkedInRewrite(selectedPost))} className="action-btn">
-                  Rewrite for LinkedIn
+                <button onClick={() => runAi("rewrite")} disabled={aiLoading} className="action-btn">
+                  Rewrite
+                </button>
+                <button onClick={() => runAi("repurpose", "LinkedIn post")} disabled={aiLoading} className="action-btn">
+                  Repurpose → LinkedIn
+                </button>
+                <button onClick={() => runAi("repurpose", "X thread")} disabled={aiLoading} className="action-btn">
+                  Repurpose → Thread
+                </button>
+                <button onClick={() => handleCopy(generatedRewrite || selectedPost.content)} className="action-btn">
+                  {copied ? "Copied" : generatedRewrite ? "Copy result" : "Copy content"}
                 </button>
                 <button
                   onClick={() => selectedPost.url && window.open(selectedPost.url, "_blank", "noopener,noreferrer")}
                   className="action-btn"
                 >
-                  Open Original
+                  Open original
                 </button>
                 <button onClick={handleSavePost} className="action-btn">
                   {selectedPostSaved ? "Saved to Favorites" : "Save to Favorites"}
                 </button>
                 <button onClick={handleFindSimilar} className="action-btn">
-                  Find Similar Posts
+                  Find similar posts
                 </button>
               </div>
+
+              {aiError && (
+                <p style={{ marginTop: "1rem", color: "#F05522", fontSize: "0.85rem", lineHeight: 1.4 }}>{aiError}</p>
+              )}
 
               {generatedRewrite && (
                 <div
