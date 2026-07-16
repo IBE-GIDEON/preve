@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import { sealToken } from "../../../../../lib/crypto/tokens";
 import { exchangeRedditCode, getRedditIdentity, hasRedditEnv } from "../../../../../lib/reddit";
 import { createClient } from "../../../../../lib/supabase/server";
 
@@ -32,7 +33,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Tokens live in `metadata` (server-only column — the accounts client never
-    // selects it, so they never reach the browser).
+    // selects it, so they never reach the browser). Sealed at rest when
+    // TOKEN_ENCRYPTION_KEY is configured.
+    const refreshToken = tokens.refresh_token ? await sealToken(tokens.refresh_token) : null;
     const { error } = await supabase.from("connected_accounts").upsert(
       {
         user_id: userData.user.id,
@@ -40,13 +43,14 @@ export async function GET(request: NextRequest) {
         platform_username: identity.username,
         status: "connected",
         last_sync_at: new Date().toISOString(),
-        metadata: { refresh_token: tokens.refresh_token ?? null, scope: tokens.scope },
+        metadata: { refresh_token: refreshToken, scope: tokens.scope },
       },
       { onConflict: "user_id,platform" },
     );
     if (error) return back("error=reddit_save");
 
-    return back("connected=reddit");
+    // autoimport=1 → the accounts page kicks off the first import by itself.
+    return back("connected=reddit&autoimport=1");
   } catch {
     return back("error=reddit_failed");
   }

@@ -53,11 +53,41 @@ export default function AccountsPage() {
   useEffect(() => {
     void load();
     // Surface the OAuth callback result, then clean the URL.
-    const query = window.location.search.replace(/^\?/, "");
+    const params = new URLSearchParams(window.location.search);
+    const query = params.get("connected")
+      ? `connected=${params.get("connected")}`
+      : params.get("error")
+        ? `error=${params.get("error")}`
+        : "";
     const match = OAUTH_NOTICES[query];
     if (match) {
       setNotice(match);
       window.history.replaceState(null, "", window.location.pathname);
+    }
+
+    // Fresh OAuth connect → pull the archive in without another click.
+    if (params.get("connected") === "reddit" && params.get("autoimport") === "1") {
+      setNotice({ type: "ok", text: "Reddit connected — importing your posts & comments…" });
+      void (async () => {
+        setBusy("reddit");
+        try {
+          const res = await fetch("/api/import/reddit", { method: "POST" });
+          const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+          if (!res.ok) throw new Error(data.error || "Import failed.");
+          setNotice({
+            type: "ok",
+            text: `Reddit connected — imported ${data.imported ?? 0} items. Head to Search and try it.`,
+          });
+        } catch (err) {
+          setNotice({
+            type: "error",
+            text: err instanceof Error ? err.message : "Connected, but the first import failed — hit Import to retry.",
+          });
+        } finally {
+          setBusy(null);
+          await load();
+        }
+      })();
     }
   }, []);
 

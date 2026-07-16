@@ -111,7 +111,7 @@ async function fetchListing(accessToken: string, path: string, after?: string) {
 export async function fetchRedditArchive(
   accessToken: string,
   username: string,
-  maxPagesPerType = 3,
+  maxPagesPerType = 10,
 ): Promise<NormalizedItem[]> {
   const items: NormalizedItem[] = [];
 
@@ -162,7 +162,7 @@ async function fetchPublicListing(username: string, type: "submitted" | "comment
 }
 
 /** Fetch a user's PUBLIC posts + comments without any credentials. */
-export async function fetchRedditPublicArchive(username: string, maxPagesPerType = 3): Promise<NormalizedItem[]> {
+export async function fetchRedditPublicArchive(username: string, maxPagesPerType = 10): Promise<NormalizedItem[]> {
   const items: NormalizedItem[] = [];
 
   for (const type of ["submitted", "comments"] as const) {

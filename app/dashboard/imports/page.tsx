@@ -108,6 +108,23 @@ export default function ImportsPage() {
     }
   }
 
+  // Hand browser-fetched items to the server in chunks (the ingest route
+  // re-validates everything and caps each request).
+  async function ingestInChunks(username: string, items: NormalizedItem[]): Promise<number> {
+    let imported = 0;
+    for (let i = 0; i < items.length; i += 500) {
+      const res = await fetch("/api/import/reddit/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, items: items.slice(i, i + 500) }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      imported += data.imported ?? 0;
+    }
+    return imported;
+  }
+
   async function handleRedditImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const username = normalizeRedditUsername(redditUsername);
@@ -119,31 +136,26 @@ export default function ImportsPage() {
     setRedditMessage(null);
 
     try {
-      let res: Response;
+      let imported: number;
       try {
         // First choice: fetch Reddit from THIS browser (a real browser on a
         // home connection is the path Reddit is least likely to bot-wall),
         // then hand the items to the server, which re-validates them.
-        const items = await fetchRedditPublicArchiveInBrowser(username, 3);
-        res = await fetch("/api/import/reddit/ingest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, items }),
-        });
+        const items = await fetchRedditPublicArchiveInBrowser(username);
+        imported = await ingestInChunks(username, items);
       } catch (browserError) {
         // Bad username → no point retrying anywhere.
         if (isFatalRedditError(browserError)) throw browserError;
         // Browser path blocked (CORS/network) → let the server fetch instead.
-        res = await fetch("/api/import/reddit", {
+        const res = await fetch("/api/import/reddit", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username }),
         });
+        const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+        if (!res.ok) throw new Error(data.error || "Import failed.");
+        imported = data.imported ?? 0;
       }
-
-      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
-      if (!res.ok) throw new Error(data.error || "Import failed.");
-      const imported = data.imported ?? 0;
       setRedditMessage({
         ok: true,
         text:
@@ -185,17 +197,7 @@ export default function ImportsPage() {
         throw new Error("No posts or comments found. Upload posts.csv or comments.csv from your Reddit export.");
       }
 
-      let imported = 0;
-      for (let i = 0; i < items.length; i += 500) {
-        const res = await fetch("/api/import/reddit/ingest", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, items: items.slice(i, i + 500) }),
-        });
-        const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
-        if (!res.ok) throw new Error(data.error || "Import failed.");
-        imported += data.imported ?? 0;
-      }
+      const imported = await ingestInChunks(username, items);
 
       setRedditMessage({
         ok: true,

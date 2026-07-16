@@ -60,7 +60,7 @@ export function isFatalRedditError(error: unknown): boolean {
 /** Fetch a user's PUBLIC posts + comments straight from the browser. */
 export async function fetchRedditPublicArchiveInBrowser(
   username: string,
-  maxPagesPerType = 3,
+  maxPagesPerType = 10,
 ): Promise<NormalizedItem[]> {
   const items: NormalizedItem[] = [];
 

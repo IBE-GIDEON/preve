@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { upsertArchiveItems } from "../../../../lib/archive/server";
+import { openToken } from "../../../../lib/crypto/tokens";
 import {
   fetchRedditArchive,
   fetchRedditPublicArchive,
@@ -71,10 +72,10 @@ export async function POST(request: Request) {
   try {
     let items: NormalizedItem[];
     if (useOauth) {
-      const tokens = await refreshRedditToken(refreshToken!);
-      items = await fetchRedditArchive(tokens.access_token, oauthUsername!, 3);
+      const tokens = await refreshRedditToken(await openToken(refreshToken!));
+      items = await fetchRedditArchive(tokens.access_token, oauthUsername!);
     } else {
-      items = await fetchRedditPublicArchive(publicUsername, 3);
+      items = await fetchRedditPublicArchive(publicUsername);
     }
 
     const imported = await upsertArchiveItems(supabase, userId, "reddit", items);
