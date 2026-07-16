@@ -32,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     (user?.user_metadata?.full_name as string | undefined) ??
     (user?.user_metadata?.name as string | undefined) ??
     null;
+  const avatarUrl = (user?.user_metadata?.avatar_url as string | undefined) ?? null;
 
   return (
     <div className="dashboard-layout">
@@ -43,7 +44,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <DashboardNav />
 
         <div className="sidebar-footer">
-          {user?.email && <SidebarUser email={user.email} name={fullName} />}
+          {user?.email && <SidebarUser email={user.email} name={fullName} avatarUrl={avatarUrl} />}
           <ThemeToggle />
         </div>
       </aside>

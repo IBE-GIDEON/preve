@@ -4,7 +4,6 @@ import {
   Bookmark,
   DownloadCloud,
   FolderOpen,
-  Home,
   Link2,
   Search,
   Settings,
@@ -19,12 +18,11 @@ const NAV_ITEMS: Array<{
   icon: LucideIcon;
   exact?: boolean;
 }> = [
-  { label: "Home", href: "/dashboard", icon: Home, exact: true },
-  { label: "Search", href: "/dashboard/search", icon: Search },
+  { label: "Search", href: "/dashboard", icon: Search, exact: true },
   { label: "Collections", href: "/dashboard/collections", icon: FolderOpen },
   { label: "Imports", href: "/dashboard/imports", icon: DownloadCloud },
   { label: "Accounts", href: "/dashboard/accounts", icon: Link2 },
-  { label: "Saved", href: "/dashboard/saved", icon: Bookmark },
+  { label: "Library", href: "/dashboard/saved", icon: Bookmark },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 

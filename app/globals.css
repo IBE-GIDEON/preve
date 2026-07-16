@@ -2288,14 +2288,71 @@ body {
   gap: 0.85rem;
 }
 
+.sidebar-user-wrap {
+  position: relative;
+}
+
 .sidebar-user {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  width: 100%;
   padding: 0.6rem 0.7rem;
   border-radius: 12px;
   border: 1px solid var(--input-border);
   background: var(--input-bg);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.sidebar-user:hover {
+  border-color: color-mix(in srgb, var(--foreground) 25%, transparent);
+}
+
+.sidebar-user-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--background);
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 0.35rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.sidebar-user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.88rem;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-user-menu-item:hover {
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.sidebar-user-menu-item.danger {
+  color: #ef4444;
+}
+
+.sidebar-user-avatar-img {
+  object-fit: cover;
 }
 
 .sidebar-user-avatar {
@@ -2337,27 +2394,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sidebar-user-signout {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--foreground);
-  opacity: 0.55;
-  cursor: pointer;
-  transition: opacity 0.2s ease, background-color 0.2s ease;
-}
-
-.sidebar-user-signout:hover {
-  opacity: 1;
-  background: color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 /* Settings / profile */

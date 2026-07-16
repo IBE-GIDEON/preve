@@ -4,6 +4,24 @@ import { createClient } from "../../../lib/supabase/server";
 
 export const maxDuration = 60;
 
+// Best-effort per-user rate limit (per warm serverless instance). Keeps a
+// single user from burning the free AI quota; a durable limiter is backlogged.
+const usage = new Map<string, number[]>();
+const WINDOW_MS = 10 * 60_000;
+const MAX_PER_WINDOW = 30;
+
+function isRateLimited(userId: string): boolean {
+  const now = Date.now();
+  const stamps = (usage.get(userId) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (stamps.length >= MAX_PER_WINDOW) {
+    usage.set(userId, stamps);
+    return true;
+  }
+  stamps.push(now);
+  usage.set(userId, stamps);
+  return false;
+}
+
 const PROMPTS: Record<string, string> = {
   summarize: "You are a concise editor. Summarize the user's post in 2 short sentences. Return only the summary.",
   rewrite:
@@ -21,6 +39,12 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (isRateLimited(data.user.id)) {
+    return NextResponse.json(
+      { error: "You're moving fast — give the AI a few minutes and try again." },
+      { status: 429 },
+    );
+  }
 
   const body = (await request.json().catch(() => ({}))) as {
     action?: string;

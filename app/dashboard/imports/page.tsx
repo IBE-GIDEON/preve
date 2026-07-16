@@ -127,7 +127,7 @@ export default function ImportsPage() {
           animate={{ opacity: 1, y: 0 }}
           style={{ width: "100%", maxWidth: "640px", margin: "0 auto" }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "2rem" }}>Connected Platforms</h1>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "2rem" }}>Imports</h1>
 
           <form
             onSubmit={handleManualImport}

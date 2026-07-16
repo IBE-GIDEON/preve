@@ -132,7 +132,7 @@ export default function LibraryPage() {
               <p className="settings-muted">Loading…</p>
             ) : savedPosts.length === 0 ? (
               <p className="settings-muted">
-                Nothing saved yet. <Link href="/dashboard/search" className="auth-inline-link">Search your archive</Link> and save posts.
+                Nothing saved yet. <Link href="/dashboard" className="auth-inline-link">Search your archive</Link> and save posts.
               </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
@@ -167,7 +167,7 @@ export default function LibraryPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {history.map((entry) => (
-                  <Link key={entry.id} href={`/dashboard/search?q=${encodeURIComponent(entry.query)}`} className="library-history-row">
+                  <Link key={entry.id} href={`/dashboard?q=${encodeURIComponent(entry.query)}`} className="library-history-row">
                     <Clock size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
                     <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.query}</span>
                     <span className="settings-muted" style={{ fontSize: "0.78rem" }}>{timeAgo(entry.createdAt)}</span>

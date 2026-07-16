@@ -33,7 +33,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (step !== "complete") return;
-    const timer = window.setTimeout(() => finishOnboarding("/dashboard/imports"), 900);
+    const timer = window.setTimeout(() => finishOnboarding("/dashboard/accounts"), 900);
     return () => window.clearTimeout(timer);
   }, [step, finishOnboarding]);
 
@@ -86,7 +86,7 @@ export default function OnboardingPage() {
                 className="hover-card"
               >
                 <span style={{ color: "#FF4500", fontSize: "1.5rem", fontWeight: 700 }}>R</span>
-                Import Content
+                Connect Reddit
               </motion.button>
 
               <motion.button
@@ -109,8 +109,8 @@ export default function OnboardingPage() {
                   opacity: 0.7,
                 }}
               >
-                <span style={{ color: "var(--foreground)", fontSize: "1.5rem", fontWeight: 700 }}>P</span>
-                Go to Dashboard
+                <span style={{ color: "var(--foreground)", fontSize: "1.5rem", fontWeight: 700 }}>→</span>
+                Skip for now
               </motion.button>
             </div>
           </motion.div>
@@ -130,8 +130,8 @@ export default function OnboardingPage() {
             }}
           >
             <div style={{ color: "#22c55e", fontSize: "3rem", marginBottom: "1rem" }}>&#10003;</div>
-            <h2 style={{ fontSize: "2rem", fontWeight: 600, marginBottom: "0.75rem" }}>Account Ready</h2>
-            <p style={{ opacity: 0.55 }}>Opening imports...</p>
+            <h2 style={{ fontSize: "2rem", fontWeight: 600, marginBottom: "0.75rem" }}>You're set</h2>
+            <p style={{ opacity: 0.55 }}>Taking you to connect Reddit…</p>
           </motion.div>
         )}
       </AnimatePresence>
