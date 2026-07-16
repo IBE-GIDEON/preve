@@ -4044,6 +4044,14 @@ body {
   overflow-x: hidden;
 }
 
+/* Form controls don't inherit fonts by default — without this, unstyled
+   inputs render at ~13px and iOS Safari zooms the page on focus. */
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 /* Mobile chrome is desktop-hidden */
 .dashboard-mobilebar,
 .dashboard-tabbar {
