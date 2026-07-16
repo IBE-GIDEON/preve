@@ -26,12 +26,15 @@ const NAV_ITEMS: Array<{
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export default function DashboardNav() {
+export default function DashboardNav({ variant = "sidebar" }: { variant?: "sidebar" | "tabbar" }) {
   const pathname = usePathname();
+  // The mobile tab bar keeps the 5 core destinations; Settings lives in the
+  // avatar menu up top (standard creator-app pattern).
+  const items = variant === "tabbar" ? NAV_ITEMS.filter((item) => item.label !== "Settings") : NAV_ITEMS;
 
   return (
-    <nav className="sidebar-nav">
-      {NAV_ITEMS.map((item) => {
+    <nav className={variant === "tabbar" ? "tabbar-nav" : "sidebar-nav"}>
+      {items.map((item) => {
         const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
         const Icon = item.icon;
 

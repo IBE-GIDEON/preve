@@ -36,6 +36,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="dashboard-layout">
+      {/* Desktop: fixed left sidebar */}
       <aside className="dashboard-sidebar">
         <Link href="/dashboard" className="logo" style={{ textDecoration: "none" }}>
           preve
@@ -49,7 +50,22 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         </div>
       </aside>
 
+      {/* Phones: sticky top bar (logo · theme · account) + bottom tab bar */}
+      <header className="dashboard-mobilebar">
+        <Link href="/dashboard" className="logo" style={{ textDecoration: "none" }}>
+          preve
+        </Link>
+        <div className="dashboard-mobilebar-actions">
+          <ThemeToggle />
+          {user?.email && <SidebarUser email={user.email} name={fullName} avatarUrl={avatarUrl} />}
+        </div>
+      </header>
+
       {children}
+
+      <nav className="dashboard-tabbar" aria-label="Primary">
+        <DashboardNav variant="tabbar" />
+      </nav>
     </div>
   );
 }

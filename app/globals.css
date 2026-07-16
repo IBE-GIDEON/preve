@@ -4016,3 +4016,191 @@ body {
     min-height: 44px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   M6 — Mobile-first dashboard. Creators are phone-first: below 768px
+   the left sidebar is replaced by a sticky top bar + a bottom tab bar,
+   and the right panel stacks under the main column. No dead ends.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Modern viewport height (fixes the iOS 100vh chrome jump) */
+.dashboard-layout {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.app-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Never allow sideways scroll jitter */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* Mobile chrome is desktop-hidden */
+.dashboard-mobilebar,
+.dashboard-tabbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* The app scrolls like a document on phones */
+  .dashboard-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  /* The desktop sidebar goes away (a later duplicate rule at the top of
+     this file used to re-show it — this block is last, so it wins). */
+  .dashboard-sidebar {
+    display: none;
+  }
+
+  /* ── Sticky top bar ── */
+  .dashboard-mobilebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    padding: 0.55rem 1rem;
+    padding-top: max(0.55rem, env(safe-area-inset-top));
+    background: var(--background);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  [data-theme='dark'] .dashboard-mobilebar {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .dashboard-mobilebar .logo {
+    font-size: 1.45rem;
+    margin-bottom: 0;
+  }
+
+  .dashboard-mobilebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  /* Account button collapses to just the avatar */
+  .dashboard-mobilebar .sidebar-user-wrap {
+    width: auto;
+  }
+
+  .dashboard-mobilebar .sidebar-user {
+    padding: 0.15rem;
+    gap: 0;
+    border: none;
+    background: transparent;
+    width: auto;
+  }
+
+  .dashboard-mobilebar .sidebar-user-meta,
+  .dashboard-mobilebar .sidebar-user > svg {
+    display: none;
+  }
+
+  .dashboard-mobilebar .sidebar-user-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  /* Menu drops DOWN from the top bar (in the sidebar it pops up) */
+  .dashboard-mobilebar .sidebar-user-menu {
+    top: calc(100% + 8px);
+    bottom: auto;
+    left: auto;
+    right: 0;
+    min-width: 200px;
+  }
+
+  /* ── Content stacks and scrolls naturally ── */
+  .dashboard-content-area {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    flex: 1;
+  }
+
+  .dashboard-main {
+    padding: 1.25rem 1rem calc(84px + env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+
+  /* When a right panel follows, IT carries the tab-bar clearance */
+  .dashboard-main:has(+ .dashboard-right-sidebar) {
+    padding-bottom: 2rem;
+  }
+
+  .dashboard-right-sidebar {
+    display: flex;
+    border-left: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    padding: 1.5rem 1rem calc(84px + env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+
+  [data-theme='dark'] .dashboard-right-sidebar {
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* ── Bottom tab bar ── */
+  .dashboard-tabbar {
+    display: block;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--background);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  [data-theme='dark'] .dashboard-tabbar {
+    border-top-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .tabbar-nav {
+    display: flex;
+  }
+
+  .tabbar-nav .nav-link {
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 54px;
+    padding: 0.5rem 0.25rem;
+    border-radius: 0;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    opacity: 0.55;
+  }
+
+  .tabbar-nav .nav-link:hover {
+    background: transparent;
+  }
+
+  .tabbar-nav .nav-link.active {
+    background: transparent;
+    color: #f05522;
+    opacity: 1;
+  }
+
+  .tabbar-nav .nav-link-icon {
+    width: 21px;
+    height: 21px;
+  }
+}

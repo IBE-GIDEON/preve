@@ -38,7 +38,7 @@ export default function OnboardingPage() {
   }, [step, finishOnboarding]);
 
   return (
-    <div className="app-container" style={{ alignItems: "center", justifyContent: "center" }}>
+    <div className="app-container" style={{ alignItems: "center", justifyContent: "center", padding: "1.25rem" }}>
       <AnimatePresence mode="wait">
         {step === "welcome" && (
           <motion.div
