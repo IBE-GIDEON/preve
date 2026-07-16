@@ -9,6 +9,7 @@ import { PlatformIcon } from "../../../components/PlatformIcon";
 import { getArchiveStats, importManualArchive, loadArchivePosts } from "../../../lib/archive/client";
 import { getConnectPlatform } from "../../../lib/connect-platforms";
 import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
+import { isValidBlueskyHandle, normalizeBlueskyHandle } from "../../../lib/bluesky-shared";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
 import { parseRedditExportCsv } from "../../../lib/reddit-export";
 import {
@@ -83,6 +84,9 @@ export default function ImportsPage() {
   const [redditImporting, setRedditImporting] = useState(false);
   const [redditMessage, setRedditMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [exportImporting, setExportImporting] = useState(false);
+  const [blueskyHandle, setBlueskyHandle] = useState("");
+  const [blueskyImporting, setBlueskyImporting] = useState(false);
+  const [blueskyMessage, setBlueskyMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const exportInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -90,6 +94,8 @@ export default function ImportsPage() {
   const importCount = countImportItems(rawText);
   const connectedPlatforms = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0).length;
   const redditIcon = getPlatformIcon("Reddit");
+  const blueskyIcon = getPlatformIcon("Bluesky");
+  const platformsWithContent = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0);
 
   useEffect(() => {
     void refreshArchive();
@@ -172,6 +178,40 @@ export default function ImportsPage() {
       setRedditMessage({ ok: false, text: message + tip });
     } finally {
       setRedditImporting(false);
+    }
+  }
+
+  async function handleBlueskyImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const handle = normalizeBlueskyHandle(blueskyHandle);
+    if (!isValidBlueskyHandle(handle)) {
+      setBlueskyMessage({ ok: false, text: "Enter a valid Bluesky handle (like you.bsky.social)." });
+      return;
+    }
+    setBlueskyImporting(true);
+    setBlueskyMessage(null);
+
+    try {
+      const res = await fetch("/api/import/bluesky", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      const imported = data.imported ?? 0;
+      setBlueskyMessage({
+        ok: true,
+        text:
+          imported === 0
+            ? "That profile has no posts to import yet."
+            : `Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"}. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setBlueskyMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setBlueskyImporting(false);
     }
   }
 
@@ -373,6 +413,79 @@ export default function ImportsPage() {
           </form>
 
           <form
+            onSubmit={handleBlueskyImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#0085FF",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                {blueskyIcon && <PlatformIcon icon={blueskyIcon} color="#ffffff" size={17} title="Bluesky" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Bluesky</h2>
+            </div>
+            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+              Type your handle — Bluesky&rsquo;s API is open. No login, no keys, no blocks.
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <input
+                value={blueskyHandle}
+                onChange={(event) => setBlueskyHandle(event.target.value)}
+                placeholder="you.bsky.social"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...fieldStyle, flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={blueskyImporting || blueskyHandle.trim().length === 0}
+                style={{
+                  background: "#0085FF",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "white",
+                  cursor: blueskyImporting || blueskyHandle.trim().length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  opacity: blueskyImporting || blueskyHandle.trim().length === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1.4rem",
+                }}
+              >
+                {blueskyImporting ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            {blueskyMessage && (
+              <div
+                style={{
+                  color: blueskyMessage.ok ? "#16a34a" : "#F05522",
+                  marginTop: "0.75rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {blueskyMessage.text}
+              </div>
+            )}
+          </form>
+
+          <form
             onSubmit={handleManualImport}
             style={{
               background: "var(--background)",
@@ -461,7 +574,15 @@ export default function ImportsPage() {
               overflow: "hidden",
             }}
           >
-            {PLATFORM_ORDER.map((item, index) => {
+            {!loading && platformsWithContent.length === 0 && (
+              <div style={{ padding: "1.75rem", textAlign: "center" }}>
+                <p style={{ fontWeight: 600 }}>Nothing imported yet</p>
+                <p className="settings-muted" style={{ marginTop: "0.3rem" }}>
+                  Your platforms appear here once content lands — start with Reddit or Bluesky above.
+                </p>
+              </div>
+            )}
+            {platformsWithContent.map((item, index) => {
               const count = totals.platformCounts[item];
               const isConnected = count > 0;
               const platformIcon = getPlatformIcon(item);
@@ -471,7 +592,7 @@ export default function ImportsPage() {
                   key={item}
                   style={{
                     padding: "2rem",
-                    borderBottom: index === PLATFORM_ORDER.length - 1 ? "none" : "1px solid rgba(0,0,0,0.05)",
+                    borderBottom: index === platformsWithContent.length - 1 ? "none" : "1px solid rgba(0,0,0,0.05)",
                   }}
                 >
                   <div

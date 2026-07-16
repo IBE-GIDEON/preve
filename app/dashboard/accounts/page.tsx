@@ -175,16 +175,20 @@ export default function AccountsPage() {
                         <>
                           <button className="settings-ghost-btn" disabled={isBusy}
                             onClick={() => run(platform.id, async () => {
-                              if (platform.id === "reddit") {
-                                const res = await fetch("/api/import/reddit", { method: "POST" });
+                              if (platform.id === "reddit" || platform.id === "bluesky") {
+                                const res = await fetch(`/api/import/${platform.id}`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({}),
+                                });
                                 const data = await res.json().catch(() => ({}));
                                 if (!res.ok) throw new Error(data.error || "Import failed.");
-                                setNotice({ type: "ok", text: `Imported ${data.imported ?? 0} items from Reddit.` });
+                                setNotice({ type: "ok", text: `Imported ${data.imported ?? 0} items from ${platform.label}.` });
                               } else {
                                 await syncAccount(platform.id);
                               }
                             })}>
-                            <RefreshCw size={14} className={isBusy ? "spin" : undefined} /> {platform.id === "reddit" ? "Import" : "Sync"}
+                            <RefreshCw size={14} className={isBusy ? "spin" : undefined} /> {platform.id === "reddit" || platform.id === "bluesky" ? "Import" : "Sync"}
                           </button>
                           <button className="settings-ghost-btn danger" disabled={isBusy}
                             onClick={() => run(platform.id, () => disconnectAccount(platform.id))}>
@@ -200,7 +204,7 @@ export default function AccountsPage() {
                             }
                             run(platform.id, () => connectAccount(platform.id, account?.handle ?? ""));
                           }}>
-                          {isBusy ? "Connecting..." : platform.oauthStart ? "Connect Reddit" : "Connect"}
+                          {isBusy ? "Connecting..." : platform.oauthStart ? `Connect ${platform.label}` : "Connect"}
                         </button>
                       )}
                     </div>

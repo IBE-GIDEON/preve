@@ -99,6 +99,19 @@ export default function DashboardPage() {
     return derived.length >= 3 ? derived : FALLBACK_SUGGESTIONS;
   }, [archivePosts]);
 
+  // Only platforms the user actually has content on (dropdowns stay honest).
+  const platformsWithContent = useMemo(
+    () => PLATFORM_ORDER.filter((platform) => archivePosts.some((post) => post.platform === platform)),
+    [archivePosts],
+  );
+
+  // If the selected platform disappears from the archive, fall back to All.
+  useEffect(() => {
+    if (filterPlatform !== "all" && archivePosts.length > 0 && !platformsWithContent.includes(filterPlatform)) {
+      setFilterPlatform("all");
+    }
+  }, [filterPlatform, platformsWithContent, archivePosts.length]);
+
   useEffect(() => {
     if (searchValue !== "") return;
     const interval = window.setInterval(() => {
@@ -510,7 +523,7 @@ export default function DashboardPage() {
                   aria-label="Filter by platform"
                 >
                   <option value="all">All platforms</option>
-                  {PLATFORM_ORDER.map((platform) => (
+                  {platformsWithContent.map((platform) => (
                     <option key={platform} value={platform}>{platform}</option>
                   ))}
                 </select>
@@ -848,7 +861,16 @@ export default function DashboardPage() {
                   Connected Platforms
                 </h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  {PLATFORM_ORDER.map((platform) => {
+                  {platformsWithContent.length === 0 && (
+                    <div style={{ fontSize: "0.88rem", opacity: 0.55, lineHeight: 1.5 }}>
+                      Nothing connected yet —{" "}
+                      <Link href="/dashboard/imports" style={{ color: "#F05522" }}>
+                        import your first archive
+                      </Link>
+                      .
+                    </div>
+                  )}
+                  {platformsWithContent.map((platform) => {
                     const count = totals.platformCounts[platform];
                     const connected = count > 0;
                     return (

@@ -55,7 +55,7 @@ export const CONNECT_PLATFORMS: ConnectPlatform[] = [
   { id: "tiktok", label: "TikTok", icon: fromSi(siTiktok), handlePrefix: "@", ready: false },
   { id: "facebook", label: "Facebook", icon: fromSi(siFacebook), handlePrefix: "", ready: false },
   { id: "mastodon", label: "Mastodon", icon: fromSi(siMastodon), handlePrefix: "@", ready: false },
-  { id: "bluesky", label: "Bluesky", icon: fromSi(siBluesky), handlePrefix: "@", ready: false },
+  { id: "bluesky", label: "Bluesky", icon: fromSi(siBluesky), handlePrefix: "@", ready: true, oauthStart: "/dashboard/imports" },
   { id: "github", label: "GitHub", icon: fromSi(siGithub), handlePrefix: "", ready: false },
   { id: "medium", label: "Medium", icon: fromSi(siMedium), handlePrefix: "@", ready: false },
   { id: "substack", label: "Substack", icon: fromSi(siSubstack), handlePrefix: "", ready: false },
