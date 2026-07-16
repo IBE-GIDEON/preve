@@ -26,11 +26,18 @@ export function isFatalBlueskyError(error: unknown): boolean {
   return error instanceof FatalBlueskyError;
 }
 
+interface EmbedView {
+  images?: { alt?: string }[];
+  alt?: string; // video embeds
+  media?: { images?: { alt?: string }[]; alt?: string }; // record-with-media
+}
+
 interface FeedItem {
   post?: {
     uri?: string;
     author?: { handle?: string };
     record?: { text?: string; createdAt?: string; reply?: unknown };
+    embed?: EmbedView;
     likeCount?: number;
     replyCount?: number;
     repostCount?: number;
@@ -52,11 +59,29 @@ function hashtagsFrom(text: string): string[] {
   return [...tags];
 }
 
+/** User-written alt text on image/video embeds — searchable words too. */
+function mediaAltsFrom(embed: EmbedView | undefined): string[] {
+  const alts: string[] = [];
+  for (const image of embed?.images ?? []) {
+    if (image?.alt?.trim()) alts.push(image.alt.trim());
+  }
+  if (embed?.alt?.trim()) alts.push(embed.alt.trim());
+  for (const image of embed?.media?.images ?? []) {
+    if (image?.alt?.trim()) alts.push(image.alt.trim());
+  }
+  if (embed?.media?.alt?.trim()) alts.push(embed.media.alt.trim());
+  return alts.slice(0, 4);
+}
+
 function normalizeFeedItem(item: FeedItem): NormalizedItem | null {
   const post = item.post;
   const uri = post?.uri ?? "";
-  const text = post?.record?.text ?? "";
-  if (!uri || !text.trim()) return null;
+  const text = (post?.record?.text ?? "").trim();
+  // Caption + media alt text together are the searchable words of the post;
+  // an image post with no caption still imports via its alt text.
+  const alts = mediaAltsFrom(post?.embed);
+  const body = [text, ...alts.map((alt) => `[image: ${alt}]`)].filter(Boolean).join("\n");
+  if (!uri || !body) return null;
 
   const rkey = uri.split("/").pop() ?? "";
   const handle = post?.author?.handle ?? "";
@@ -66,9 +91,9 @@ function normalizeFeedItem(item: FeedItem): NormalizedItem | null {
     platform_item_id: uri.slice(0, 200),
     kind: post?.record?.reply ? "comment" : "post",
     source_title: null,
-    body: text,
+    body,
     url: handle && rkey ? `https://bsky.app/profile/${handle}/post/${rkey}` : null,
-    topics: hashtagsFrom(text),
+    topics: hashtagsFrom(body),
     engagement: { likes: post?.likeCount ?? 0, comments: post?.replyCount ?? 0 },
     published_at: Number.isNaN(createdAt.getTime()) ? new Date().toISOString() : createdAt.toISOString(),
   };
