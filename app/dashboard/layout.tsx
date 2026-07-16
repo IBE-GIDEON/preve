@@ -1,3 +1,4 @@
+import { Heart } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -5,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import ThemeToggle from "../../components/ThemeToggle";
 import DashboardNav from "../../components/DashboardNav";
 import SidebarUser from "../../components/SidebarUser";
+import { getSupportUrl } from "../../lib/support";
 import { hasSupabasePublicEnv, isLocalPreviewAuthBypassEnabled } from "../../lib/supabase/env";
 import { createClient } from "../../lib/supabase/server";
 
@@ -44,6 +46,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
         <DashboardNav />
 
+        {getSupportUrl() && (
+          <a
+            href={getSupportUrl()!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="sidebar-support-pill"
+          >
+            <Heart size={14} aria-hidden="true" /> Support preve
+          </a>
+        )}
+
         <div className="sidebar-footer">
           {user?.email && <SidebarUser email={user.email} name={fullName} avatarUrl={avatarUrl} />}
           <ThemeToggle />
@@ -56,6 +69,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           preve
         </Link>
         <div className="dashboard-mobilebar-actions">
+          {getSupportUrl() && (
+            <a
+              href={getSupportUrl()!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mobilebar-support"
+              aria-label="Support preve"
+            >
+              <Heart size={18} aria-hidden="true" />
+            </a>
+          )}
           <ThemeToggle />
           {user?.email && <SidebarUser email={user.email} name={fullName} avatarUrl={avatarUrl} />}
         </div>

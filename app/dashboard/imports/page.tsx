@@ -6,7 +6,7 @@ import type { Platform, Post, PostKind } from "../../data/mockPosts";
 import { getPlatformColor } from "../../data/mockPosts";
 import { PLATFORM_ORDER } from "../../lib/preveState";
 import { PlatformIcon } from "../../../components/PlatformIcon";
-import { getArchiveStats, importManualArchive, loadArchivePosts } from "../../../lib/archive/client";
+import { getArchiveStats, importManualArchive, loadArchivePostsCached } from "../../../lib/archive/client";
 import { getConnectPlatform } from "../../../lib/connect-platforms";
 import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 import { isValidBlueskyHandle, normalizeBlueskyHandle } from "../../../lib/bluesky-shared";
@@ -104,8 +104,11 @@ export default function ImportsPage() {
   async function refreshArchive() {
     try {
       setLoading(true);
-      const result = await loadArchivePosts();
-      setArchivePosts(result.posts);
+      // Cached snapshot paints instantly; fresh data replaces it in place.
+      await loadArchivePostsCached((result) => {
+        setArchivePosts(result.posts);
+        setLoading(false);
+      });
       getRecentImportJobs().then(setImportJobs).catch(() => {});
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Could not load your archive.");

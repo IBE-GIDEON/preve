@@ -138,6 +138,43 @@ async function getUserId() {
   return data.user.id;
 }
 
+// Stale-while-revalidate: paint instantly from the last snapshot (per user,
+// per tab), then refresh from the network and update in place. This is what
+// makes the dashboard feel native-fast on every repeat visit.
+const ARCHIVE_CACHE_PREFIX = "preve:archive:";
+
+async function archiveCacheKey(): Promise<string | null> {
+  try {
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession(); // local read — no network
+    const uid = data.session?.user?.id;
+    return uid ? `${ARCHIVE_CACHE_PREFIX}${uid}` : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadArchivePostsCached(
+  apply: (result: ArchiveLoadResult, fresh: boolean) => void,
+): Promise<void> {
+  let key: string | null = null;
+  try {
+    key = await archiveCacheKey();
+    const raw = key ? sessionStorage.getItem(key) : null;
+    if (raw) apply(JSON.parse(raw) as ArchiveLoadResult, false);
+  } catch {
+    // cache is best-effort only
+  }
+
+  const result = await loadArchivePosts();
+  apply(result, true);
+  try {
+    if (key) sessionStorage.setItem(key, JSON.stringify(result));
+  } catch {
+    // storage full/unavailable — skip caching
+  }
+}
+
 export async function loadArchivePosts(): Promise<ArchiveLoadResult> {
   const supabase = createClient();
 

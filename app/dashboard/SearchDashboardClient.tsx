@@ -26,7 +26,7 @@ import { recordSearch } from "../../lib/workspace/client";
 import {
   getArchiveStats,
   getSimilarArchivePosts,
-  loadArchivePosts,
+  loadArchivePostsCached,
   toggleArchiveItemSaved,
 } from "../../lib/archive/client";
 import {
@@ -180,9 +180,12 @@ export default function DashboardPage() {
     try {
       setArchiveLoading(true);
       setArchiveMessage("");
-      const result = await loadArchivePosts();
-      setArchivePosts(result.posts);
-      setSavedPostIds(result.savedPostIds);
+      // Cached snapshot paints instantly; fresh data replaces it in place.
+      await loadArchivePostsCached((result) => {
+        setArchivePosts(result.posts);
+        setSavedPostIds(result.savedPostIds);
+        setArchiveLoading(false);
+      });
     } catch (error) {
       setArchiveMessage(error instanceof Error ? error.message : "Could not load your archive.");
     } finally {

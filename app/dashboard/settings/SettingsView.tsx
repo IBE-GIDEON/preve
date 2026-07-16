@@ -122,8 +122,8 @@ export default function SettingsView({ account, canDeleteAccount }: SettingsView
                 <div>
                   <div className="settings-row-label">Become a founding supporter</div>
                   <div className="settings-muted">
-                    preve is free while we grow. Supporters keep the servers on — and get Pro free
-                    when pricing starts.
+                    preve is free while we grow. Supporters keep the servers on — and lock in{" "}
+                    <strong>50% off Pro, for life</strong>, when pricing starts.
                   </div>
                 </div>
                 <a

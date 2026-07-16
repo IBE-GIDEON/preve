@@ -4318,3 +4318,35 @@ textarea {
   background: rgba(220, 38, 38, 0.12);
   color: #dc2626;
 }
+
+/* ── "Support preve" placements (render only when NEXT_PUBLIC_DONATE_URL is set) ── */
+.sidebar-support-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid rgba(240, 85, 34, 0.35);
+  border-radius: 9999px;
+  color: #f05522;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-support-pill:hover {
+  background: rgba(240, 85, 34, 0.08);
+  border-color: rgba(240, 85, 34, 0.6);
+}
+
+.mobilebar-support {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  color: #f05522;
+}
