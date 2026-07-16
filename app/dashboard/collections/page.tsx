@@ -1,11 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FolderOpen, Plus } from "lucide-react";
+import { FolderOpen, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import ConfirmDialog from "../../../components/ConfirmDialog";
 import {
   createCollection,
+  deleteCollection,
   listCollections,
   type Collection,
 } from "../../../lib/collections/client";
@@ -17,6 +19,8 @@ export default function CollectionsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Collection | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     void load();
@@ -46,6 +50,22 @@ export default function CollectionsPage() {
       setError(err instanceof Error ? err.message : "Could not create collection.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteCollection(pendingDelete.id);
+      setCollections((prev) => prev.filter((c) => c.id !== pendingDelete.id));
+      setPendingDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the collection.");
+      setPendingDelete(null);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -96,22 +116,51 @@ export default function CollectionsPage() {
           ) : (
             <div className="collections-grid">
               {collections.map((collection) => (
-                <Link key={collection.id} href={`/dashboard/collections/${collection.id}`} className="collection-card">
-                  <div className="collection-card-icon"><FolderOpen size={18} /></div>
-                  <div style={{ fontWeight: 600 }}>{collection.name}</div>
-                  {collection.description && (
-                    <div className="settings-muted" style={{ marginTop: "0.25rem" }}>{collection.description}</div>
-                  )}
-                  <div className="collection-card-meta">
-                    {collection.itemCount} {collection.itemCount === 1 ? "item" : "items"}
-                    {collection.isPublic && <span className="collection-badge">Public</span>}
-                  </div>
-                </Link>
+                <div key={collection.id} className="collection-card-wrap">
+                  <Link href={`/dashboard/collections/${collection.id}`} className="collection-card">
+                    <div className="collection-card-icon"><FolderOpen size={18} /></div>
+                    <div style={{ fontWeight: 600, paddingRight: "2rem" }}>{collection.name}</div>
+                    {collection.description && (
+                      <div className="settings-muted" style={{ marginTop: "0.25rem" }}>{collection.description}</div>
+                    )}
+                    <div className="collection-card-meta">
+                      {collection.itemCount} {collection.itemCount === 1 ? "item" : "items"}
+                      {collection.isPublic && <span className="collection-badge">Public</span>}
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    className="collection-card-delete"
+                    aria-label={`Delete ${collection.name}`}
+                    title="Delete collection"
+                    onClick={() => setPendingDelete(collection)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </motion.div>
       </main>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete collection?"
+        message={
+          pendingDelete
+            ? pendingDelete.itemCount === 0
+              ? `"${pendingDelete.name}" will be gone for good. It's empty — nothing else is affected.`
+              : `"${pendingDelete.name}" will be gone for good. The ${
+                  pendingDelete.itemCount === 1 ? "post" : `${pendingDelete.itemCount} posts`
+                } inside stay safe in your archive.`
+            : ""
+        }
+        confirmLabel="Delete collection"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => !deleting && setPendingDelete(null)}
+      />
     </div>
   );
 }

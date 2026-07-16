@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Post } from "../../../data/mockPosts";
 import { getPlatformColor } from "../../../data/mockPosts";
+import ConfirmDialog from "../../../../components/ConfirmDialog";
 import { loadArchivePosts } from "../../../../lib/archive/client";
 import {
   addItemToCollection,
@@ -28,6 +29,8 @@ export default function CollectionDetailPage() {
   const [archive, setArchive] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -96,10 +99,17 @@ export default function CollectionDetailPage() {
   }
 
   async function handleDelete() {
-    if (!window.confirm("Delete this collection? The posts stay in your archive.")) return;
-    await deleteCollection(id);
-    router.push("/dashboard/collections");
-    router.refresh();
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteCollection(id);
+      router.push("/dashboard/collections");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete the collection.");
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
   }
 
   if (loading) {
@@ -158,7 +168,7 @@ export default function CollectionDetailPage() {
                 <div className="settings-row-label" style={{ color: "#ef4444" }}>Delete collection</div>
                 <div className="settings-muted">Posts stay in your archive.</div>
               </div>
-              <button className="settings-ghost-btn danger" onClick={handleDelete}>
+              <button className="settings-ghost-btn danger" onClick={() => setConfirmingDelete(true)}>
                 <Trash2 size={15} /> Delete
               </button>
             </div>
@@ -211,6 +221,16 @@ export default function CollectionDetailPage() {
           <p className="settings-status ok" style={{ opacity: 0 }} aria-hidden><Check size={12} /></p>
         </motion.div>
       </main>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete collection?"
+        message={`"${collection.name}" will be gone for good. The posts inside stay safe in your archive.`}
+        confirmLabel="Delete collection"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => !deleting && setConfirmingDelete(false)}
+      />
     </div>
   );
 }
