@@ -8,7 +8,12 @@ import { PLATFORM_ORDER } from "../../lib/preveState";
 import { getArchiveStats, importManualArchive, loadArchivePosts } from "../../../lib/archive/client";
 import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
-import { isValidRedditUsername, normalizeRedditUsername } from "../../../lib/reddit-shared";
+import { parseRedditExportCsv } from "../../../lib/reddit-export";
+import {
+  isValidRedditUsername,
+  normalizeRedditUsername,
+  type NormalizedItem,
+} from "../../../lib/reddit-shared";
 
 const KIND_OPTIONS: PostKind[] = ["Post", "Comment", "Thread", "Article"];
 
@@ -74,6 +79,8 @@ export default function ImportsPage() {
   const [redditUsername, setRedditUsername] = useState("");
   const [redditImporting, setRedditImporting] = useState(false);
   const [redditMessage, setRedditMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [exportImporting, setExportImporting] = useState(false);
+  const exportInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
@@ -142,9 +149,60 @@ export default function ImportsPage() {
       });
       await refreshArchive();
     } catch (error) {
-      setRedditMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+      const message = error instanceof Error ? error.message : "Import failed.";
+      const tip = message.includes("doesn't exist")
+        ? ""
+        : " Tip: upload your Reddit export below — that always works.";
+      setRedditMessage({ ok: false, text: message + tip });
     } finally {
       setRedditImporting(false);
+    }
+  }
+
+  // Guaranteed path: the user uploads posts.csv / comments.csv from Reddit's
+  // official data export — no API involved, so nothing can block it.
+  async function handleRedditExportUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const username = normalizeRedditUsername(redditUsername);
+    if (!isValidRedditUsername(username)) {
+      setRedditMessage({ ok: false, text: "Type your Reddit username above first, then upload your export." });
+      if (exportInputRef.current) exportInputRef.current.value = "";
+      return;
+    }
+    setExportImporting(true);
+    setRedditMessage(null);
+
+    try {
+      const items: NormalizedItem[] = [];
+      for (const file of Array.from(files)) {
+        items.push(...parseRedditExportCsv(await file.text()));
+      }
+      if (items.length === 0) {
+        throw new Error("No posts or comments found. Upload posts.csv or comments.csv from your Reddit export.");
+      }
+
+      let imported = 0;
+      for (let i = 0; i < items.length; i += 500) {
+        const res = await fetch("/api/import/reddit/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, items: items.slice(i, i + 500) }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+        if (!res.ok) throw new Error(data.error || "Import failed.");
+        imported += data.imported ?? 0;
+      }
+
+      setRedditMessage({
+        ok: true,
+        text: `Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"} from your export. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setRedditMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setExportImporting(false);
+      if (exportInputRef.current) exportInputRef.current.value = "";
     }
   }
 
@@ -256,6 +314,34 @@ export default function ImportsPage() {
                 {redditMessage.text}
               </div>
             )}
+
+            <div style={{ borderTop: "1px solid rgba(0,0,0,0.08)", marginTop: "1.25rem", paddingTop: "1rem" }}>
+              <div style={{ fontSize: "0.9rem", opacity: 0.75, marginBottom: "0.6rem", lineHeight: 1.5 }}>
+                <strong>Or upload your Reddit export</strong> (works even when Reddit blocks imports):
+                request it at{" "}
+                <a
+                  href="https://www.reddit.com/settings/data-request"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "#FF4500", textDecoration: "underline" }}
+                >
+                  reddit.com/settings/data-request
+                </a>
+                , unzip the file Reddit emails you, then drop <code>posts.csv</code> and <code>comments.csv</code> here.
+              </div>
+              <input
+                ref={exportInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                multiple
+                disabled={exportImporting}
+                onChange={(event) => void handleRedditExportUpload(event.target.files)}
+                style={{ fontSize: "0.85rem", opacity: exportImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+              />
+              {exportImporting && (
+                <div style={{ fontSize: "0.85rem", opacity: 0.6, marginTop: "0.5rem" }}>Reading your export…</div>
+              )}
+            </div>
           </form>
 
           <form
