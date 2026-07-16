@@ -33,7 +33,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (step !== "complete") return;
-    const timer = window.setTimeout(() => finishOnboarding("/dashboard/accounts"), 900);
+    const timer = window.setTimeout(() => finishOnboarding("/dashboard/imports"), 900);
     return () => window.clearTimeout(timer);
   }, [step, finishOnboarding]);
 
@@ -86,7 +86,7 @@ export default function OnboardingPage() {
                 className="hover-card"
               >
                 <span style={{ color: "#FF4500", fontSize: "1.5rem", fontWeight: 700 }}>R</span>
-                Connect Reddit
+                Import from Reddit
               </motion.button>
 
               <motion.button
@@ -131,7 +131,7 @@ export default function OnboardingPage() {
           >
             <div style={{ color: "#22c55e", fontSize: "3rem", marginBottom: "1rem" }}>&#10003;</div>
             <h2 style={{ fontSize: "2rem", fontWeight: 600, marginBottom: "0.75rem" }}>You're set</h2>
-            <p style={{ opacity: 0.55 }}>Taking you to connect Reddit…</p>
+            <p style={{ opacity: 0.55 }}>Taking you to import your Reddit…</p>
           </motion.div>
         )}
       </AnimatePresence>

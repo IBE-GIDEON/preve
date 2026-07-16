@@ -69,6 +69,9 @@ export default function ImportsPage() {
   const [importing, setImporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
+  const [redditUsername, setRedditUsername] = useState("");
+  const [redditImporting, setRedditImporting] = useState(false);
+  const [redditMessage, setRedditMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
@@ -89,6 +92,35 @@ export default function ImportsPage() {
       setStatusMessage(error instanceof Error ? error.message : "Could not load your archive.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRedditImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setRedditImporting(true);
+    setRedditMessage(null);
+
+    try {
+      const res = await fetch("/api/import/reddit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: redditUsername }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      const imported = data.imported ?? 0;
+      setRedditMessage({
+        ok: true,
+        text:
+          imported === 0
+            ? "That profile has nothing public to import."
+            : `Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"}. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setRedditMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setRedditImporting(false);
     }
   }
 
@@ -128,6 +160,79 @@ export default function ImportsPage() {
           style={{ width: "100%", maxWidth: "640px", margin: "0 auto" }}
         >
           <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "2rem" }}>Imports</h1>
+
+          <form
+            onSubmit={handleRedditImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#FF4500",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                R
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Reddit</h2>
+            </div>
+            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+              Type your username — we pull your public posts and comments. No Reddit login needed.
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <input
+                value={redditUsername}
+                onChange={(event) => setRedditUsername(event.target.value)}
+                placeholder="u/yourname"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...fieldStyle, flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={redditImporting || redditUsername.trim().length === 0}
+                style={{
+                  background: "#FF4500",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "white",
+                  cursor: redditImporting || redditUsername.trim().length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  opacity: redditImporting || redditUsername.trim().length === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1.4rem",
+                }}
+              >
+                {redditImporting ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            {redditMessage && (
+              <div
+                style={{
+                  color: redditMessage.ok ? "#16a34a" : "#F05522",
+                  marginTop: "0.75rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {redditMessage.text}
+              </div>
+            )}
+          </form>
 
           <form
             onSubmit={handleManualImport}

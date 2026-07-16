@@ -33,7 +33,10 @@ function lastSyncLabel(iso: string | null) {
 
 const OAUTH_NOTICES: Record<string, { type: "ok" | "error"; text: string }> = {
   "connected=reddit": { type: "ok", text: "Reddit connected — hit Import to pull in your posts & comments." },
-  "error=reddit_not_configured": { type: "error", text: "Reddit isn't configured on the server yet." },
+  "error=reddit_not_configured": {
+    type: "error",
+    text: "Reddit login isn't set up yet — use Imports to pull your public history by username instead.",
+  },
   "error=reddit_denied": { type: "error", text: "Reddit connection was cancelled." },
   "error=reddit_state": { type: "error", text: "That connection attempt expired. Please try again." },
   "error=reddit_failed": { type: "error", text: "Couldn't connect Reddit. Please try again." },

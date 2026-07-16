@@ -173,3 +173,64 @@ export async function fetchRedditArchive(
 
   return items;
 }
+
+// ── Keyless import: Reddit's public JSON endpoints ──────────────────────────
+// A user's posts/comments are public JSON — no OAuth app, no API key. The
+// same listing shape as the OAuth API, so the normalizers above are reused.
+// Some hosts bot-wall certain IPs, so each is tried until one returns JSON.
+
+const PUBLIC_HOSTS = ["https://www.reddit.com", "https://old.reddit.com", "https://api.reddit.com"];
+
+/** Strip "u/" / "/user/" prefixes and trailing slashes from user input. */
+export function normalizeRedditUsername(raw: string): string {
+  return raw.trim().replace(/^\/?u(ser)?\//i, "").replace(/\/+$/, "");
+}
+
+export function isValidRedditUsername(name: string): boolean {
+  return /^[A-Za-z0-9_-]{3,20}$/.test(name);
+}
+
+async function fetchPublicListing(username: string, type: "submitted" | "comments", after?: string) {
+  const params = new URLSearchParams({ limit: "100", raw_json: "1" });
+  if (after) params.set("after", after);
+
+  for (const host of PUBLIC_HOSTS) {
+    // api.reddit.com serves JSON natively; the others need the .json suffix.
+    const path =
+      host === "https://api.reddit.com" ? `/user/${username}/${type}` : `/user/${username}/${type}.json`;
+    try {
+      const res = await fetch(`${host}${path}?${params.toString()}`, {
+        headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
+      });
+      if (res.status === 404) throw new Error("That Reddit username doesn't exist.");
+      if (!res.ok) continue; // walled or rate limited on this host — try the next
+      if (!(res.headers.get("content-type") ?? "").includes("json")) continue; // bot wall serving HTML
+      return (await res.json()) as {
+        data: { after: string | null; children: { kind: string; data: RedditData }[] };
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("doesn't exist")) throw error;
+      // network error on this host — fall through to the next
+    }
+  }
+  throw new Error("Reddit is blocking anonymous access right now. Try again in a few minutes.");
+}
+
+/** Fetch a user's PUBLIC posts + comments without any credentials. */
+export async function fetchRedditPublicArchive(username: string, maxPagesPerType = 3): Promise<NormalizedItem[]> {
+  const items: NormalizedItem[] = [];
+
+  for (const type of ["submitted", "comments"] as const) {
+    let after: string | undefined;
+    for (let page = 0; page < maxPagesPerType; page++) {
+      const listing = await fetchPublicListing(username, type, after);
+      for (const child of listing.data.children) {
+        items.push(type === "submitted" ? normalizeSubmitted(child.data) : normalizeComment(child.data));
+      }
+      if (!listing.data.after) break;
+      after = listing.data.after;
+    }
+  }
+
+  return items;
+}
