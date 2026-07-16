@@ -440,7 +440,7 @@ export default function DashboardPage() {
                   className="search-filter-select"
                   aria-label="Filter by date"
                 >
-                  <option value="all">Any time</option>
+                  <option value="all">All time</option>
                   <option value="7">Past week</option>
                   <option value="30">Past month</option>
                   <option value="90">Past 3 months</option>

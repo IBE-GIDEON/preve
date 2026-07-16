@@ -3042,10 +3042,14 @@ img.settings-avatar {
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  background-color: var(--input-bg);
+  background-image: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='m6 9 6 6 6-6' stroke='%23777777' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 0.72rem center;
+  background-repeat: no-repeat;
+  background-size: 0.82rem;
   color: var(--foreground);
   border-radius: 9999px;
-  padding: 0.4rem 0.9rem;
+  padding: 0.4rem 2rem 0.4rem 0.9rem;
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
