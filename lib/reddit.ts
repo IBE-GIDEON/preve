@@ -1,5 +1,18 @@
 // Reddit OAuth + API helpers. Server-only (uses client secret) — never import
-// into client components.
+// into client components. Shared normalizers live in lib/reddit-shared.ts.
+
+import {
+  normalizeComment,
+  normalizeSubmitted,
+  type NormalizedItem,
+  type RedditListing,
+} from "./reddit-shared";
+
+export {
+  isValidRedditUsername,
+  normalizeRedditUsername,
+  type NormalizedItem,
+} from "./reddit-shared";
 
 const AUTH_BASE = "https://www.reddit.com/api/v1";
 const API_BASE = "https://oauth.reddit.com";
@@ -79,33 +92,7 @@ export async function getRedditIdentity(accessToken: string): Promise<{ username
 
 export { API_BASE as REDDIT_API_BASE, USER_AGENT as REDDIT_USER_AGENT };
 
-// ── Import: fetch + normalize a user's posts and comments ───────────────────
-
-export interface NormalizedItem {
-  platform_item_id: string;
-  kind: "post" | "comment";
-  source_title: string | null;
-  body: string;
-  url: string | null;
-  topics: string[];
-  engagement: { likes: number; comments: number };
-  published_at: string;
-}
-
-interface RedditData {
-  id?: string;
-  name?: string;
-  title?: string;
-  selftext?: string;
-  body?: string;
-  permalink?: string;
-  url?: string;
-  subreddit?: string;
-  score?: number;
-  num_comments?: number;
-  created_utc?: number;
-  link_title?: string;
-}
+// ── Import: fetch + normalize a user's posts and comments (OAuth) ───────────
 
 async function fetchListing(accessToken: string, path: string, after?: string) {
   const url = new URL(`${API_BASE}${path}`);
@@ -117,38 +104,7 @@ async function fetchListing(accessToken: string, path: string, after?: string) {
     headers: { Authorization: `Bearer ${accessToken}`, "User-Agent": USER_AGENT },
   });
   if (!res.ok) throw new Error(`Reddit fetch failed (${res.status})`);
-  return (await res.json()) as { data: { after: string | null; children: { kind: string; data: RedditData }[] } };
-}
-
-function permalinkUrl(d: RedditData): string | null {
-  if (d.permalink) return `https://www.reddit.com${d.permalink}`;
-  return d.url ?? null;
-}
-
-function normalizeSubmitted(d: RedditData): NormalizedItem {
-  return {
-    platform_item_id: d.name ?? `t3_${d.id}`,
-    kind: "post",
-    source_title: d.title ?? null,
-    body: (d.selftext && d.selftext.trim()) || d.title || "",
-    url: permalinkUrl(d),
-    topics: d.subreddit ? [d.subreddit] : [],
-    engagement: { likes: d.score ?? 0, comments: d.num_comments ?? 0 },
-    published_at: new Date((d.created_utc ?? 0) * 1000).toISOString(),
-  };
-}
-
-function normalizeComment(d: RedditData): NormalizedItem {
-  return {
-    platform_item_id: d.name ?? `t1_${d.id}`,
-    kind: "comment",
-    source_title: d.link_title ?? null,
-    body: d.body ?? "",
-    url: permalinkUrl(d),
-    topics: d.subreddit ? [d.subreddit] : [],
-    engagement: { likes: d.score ?? 0, comments: 0 },
-    published_at: new Date((d.created_utc ?? 0) * 1000).toISOString(),
-  };
+  return (await res.json()) as RedditListing;
 }
 
 /** Fetch a user's submitted posts + comments (paged, capped) and normalize. */
@@ -174,21 +130,12 @@ export async function fetchRedditArchive(
   return items;
 }
 
-// ── Keyless import: Reddit's public JSON endpoints ──────────────────────────
-// A user's posts/comments are public JSON — no OAuth app, no API key. The
-// same listing shape as the OAuth API, so the normalizers above are reused.
-// Some hosts bot-wall certain IPs, so each is tried until one returns JSON.
+// ── Keyless import: Reddit's public JSON endpoints (server-side) ────────────
+// A user's posts/comments are public JSON — no OAuth app, no API key. Same
+// listing shape as the OAuth API, so the normalizers are reused. Some hosts
+// bot-wall certain IPs, so each is tried until one returns JSON.
 
 const PUBLIC_HOSTS = ["https://www.reddit.com", "https://old.reddit.com", "https://api.reddit.com"];
-
-/** Strip "u/" / "/user/" prefixes and trailing slashes from user input. */
-export function normalizeRedditUsername(raw: string): string {
-  return raw.trim().replace(/^\/?u(ser)?\//i, "").replace(/\/+$/, "");
-}
-
-export function isValidRedditUsername(name: string): boolean {
-  return /^[A-Za-z0-9_-]{3,20}$/.test(name);
-}
 
 async function fetchPublicListing(username: string, type: "submitted" | "comments", after?: string) {
   const params = new URLSearchParams({ limit: "100", raw_json: "1" });
@@ -205,9 +152,7 @@ async function fetchPublicListing(username: string, type: "submitted" | "comment
       if (res.status === 404) throw new Error("That Reddit username doesn't exist.");
       if (!res.ok) continue; // walled or rate limited on this host — try the next
       if (!(res.headers.get("content-type") ?? "").includes("json")) continue; // bot wall serving HTML
-      return (await res.json()) as {
-        data: { after: string | null; children: { kind: string; data: RedditData }[] };
-      };
+      return (await res.json()) as RedditListing;
     } catch (error) {
       if (error instanceof Error && error.message.includes("doesn't exist")) throw error;
       // network error on this host — fall through to the next

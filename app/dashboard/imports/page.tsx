@@ -7,6 +7,8 @@ import { getPlatformColor } from "../../data/mockPosts";
 import { PLATFORM_ORDER } from "../../lib/preveState";
 import { getArchiveStats, importManualArchive, loadArchivePosts } from "../../../lib/archive/client";
 import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
+import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
+import { isValidRedditUsername, normalizeRedditUsername } from "../../../lib/reddit-shared";
 
 const KIND_OPTIONS: PostKind[] = ["Post", "Comment", "Thread", "Article"];
 
@@ -97,15 +99,37 @@ export default function ImportsPage() {
 
   async function handleRedditImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const username = normalizeRedditUsername(redditUsername);
+    if (!isValidRedditUsername(username)) {
+      setRedditMessage({ ok: false, text: "Enter a valid Reddit username (like u/yourname)." });
+      return;
+    }
     setRedditImporting(true);
     setRedditMessage(null);
 
     try {
-      const res = await fetch("/api/import/reddit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: redditUsername }),
-      });
+      let res: Response;
+      try {
+        // First choice: fetch Reddit from THIS browser (a real browser on a
+        // home connection is the path Reddit is least likely to bot-wall),
+        // then hand the items to the server, which re-validates them.
+        const items = await fetchRedditPublicArchiveInBrowser(username, 3);
+        res = await fetch("/api/import/reddit/ingest", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, items }),
+        });
+      } catch (browserError) {
+        // Bad username → no point retrying anywhere.
+        if (isFatalRedditError(browserError)) throw browserError;
+        // Browser path blocked (CORS/network) → let the server fetch instead.
+        res = await fetch("/api/import/reddit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username }),
+        });
+      }
+
       const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
       if (!res.ok) throw new Error(data.error || "Import failed.");
       const imported = data.imported ?? 0;

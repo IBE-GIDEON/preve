@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { upsertArchiveItems } from "../../../../lib/archive/server";
 import {
   fetchRedditArchive,
   fetchRedditPublicArchive,
@@ -76,28 +77,7 @@ export async function POST(request: Request) {
       items = await fetchRedditPublicArchive(publicUsername, 3);
     }
 
-    const rows = items.map((item) => ({
-      user_id: userId,
-      platform: "reddit",
-      platform_item_id: item.platform_item_id,
-      kind: item.kind,
-      source_title: item.source_title,
-      body: item.body,
-      url: item.url,
-      topics: item.topics,
-      engagement: item.engagement,
-      published_at: item.published_at,
-    }));
-
-    let imported = 0;
-    for (let i = 0; i < rows.length; i += 100) {
-      const batch = rows.slice(i, i + 100);
-      const { error } = await supabase
-        .from("archive_items")
-        .upsert(batch, { onConflict: "user_id,platform,platform_item_id" });
-      if (error) throw new Error(error.message);
-      imported += batch.length;
-    }
+    const imported = await upsertArchiveItems(supabase, userId, "reddit", items);
 
     const now = new Date().toISOString();
     if (job) {
