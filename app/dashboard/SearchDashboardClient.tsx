@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   getEngagementScore,
@@ -11,6 +11,7 @@ import {
   type PostKind,
 } from "../data/mockPosts";
 import { searchArchive } from "../../lib/search/client";
+import { deriveSuggestions } from "../../lib/search/suggestions";
 import { buildEmbeddings, semanticSearch } from "../../lib/semantic/client";
 import {
   addSavedSearch,
@@ -29,12 +30,14 @@ import {
   toggleArchiveItemSaved,
 } from "../../lib/archive/client";
 
-const SUGGESTIONS = [
-  "React performance",
-  "Stripe integration",
-  "Startup ideas",
-  "Docker comments",
-  "AI posts",
+// Shown only before any content is imported — once the archive has items,
+// chips are mined from the user's own posts (lib/search/suggestions).
+const FALLBACK_SUGGESTIONS = [
+  "your favorite topic",
+  "something you posted",
+  "a comment you loved",
+  "your best advice",
+  "an old idea",
 ];
 
 const numberFormatter = new Intl.NumberFormat("en-US");
@@ -76,13 +79,19 @@ export default function DashboardPage() {
     loadArchive();
   }, []);
 
+  // Chips come from the user's own archive; generic list only pre-import.
+  const suggestions = useMemo(() => {
+    const derived = deriveSuggestions(archivePosts);
+    return derived.length >= 3 ? derived : FALLBACK_SUGGESTIONS;
+  }, [archivePosts]);
+
   useEffect(() => {
     if (searchValue !== "") return;
     const interval = window.setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % SUGGESTIONS.length);
+      setCurrentIndex((prev) => (prev + 1) % suggestions.length);
     }, 3000);
     return () => window.clearInterval(interval);
-  }, [searchValue]);
+  }, [searchValue, suggestions.length]);
 
   useEffect(() => {
     if (searchValue === "") setSelectedPost(null);
@@ -191,8 +200,8 @@ export default function DashboardPage() {
   }
 
   const visibleSuggestions = [];
-  for (let i = 0; i < 3; i += 1) {
-    visibleSuggestions.push(SUGGESTIONS[(currentIndex + i) % SUGGESTIONS.length]);
+  for (let i = 0; i < Math.min(3, suggestions.length); i += 1) {
+    visibleSuggestions.push(suggestions[(currentIndex + i) % suggestions.length]);
   }
 
   // Debounce the query so search-as-you-type hits the server at most every 300ms.
