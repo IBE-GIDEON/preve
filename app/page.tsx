@@ -18,6 +18,7 @@ import Link from "next/link";
 import ThemeToggle from "../components/ThemeToggle";
 import FloatingIcons from "../components/FloatingIcons";
 import LiveFeedDemo from "../components/LiveFeedDemo";
+import { getSupportUrl } from "../lib/support";
 import { CommunityCardStack } from "../components/CommunityCardStack";
 import { WhyItMattersCarousel } from "../components/WhyItMattersCarousel";
 import { FaLinkedin, FaReddit } from "react-icons/fa";
@@ -410,6 +411,16 @@ export default function LandingPage() {
           <div className="footer-bottom-links">
             <Link href="/privacy" className="footer-bottom-link">Privacy Policy</Link>
             <Link href="/terms" className="footer-bottom-link">Terms of Service</Link>
+            {getSupportUrl() && (
+              <a
+                href={getSupportUrl()!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer-bottom-link"
+              >
+                ♥ Support preve
+              </a>
+            )}
           </div>
         </div>
       </footer>
