@@ -168,7 +168,7 @@ export default function ImportsPage() {
       const message = error instanceof Error ? error.message : "Import failed.";
       const tip = message.includes("doesn't exist")
         ? ""
-        : " Tip: upload your Reddit export below — that always works.";
+        : " Use Connect Reddit above instead — it doesn't get blocked.";
       setRedditMessage({ ok: false, text: message + tip });
     } finally {
       setRedditImporting(false);
@@ -278,7 +278,29 @@ export default function ImportsPage() {
               <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Reddit</h2>
             </div>
             <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
-              Type your username — we pull your public posts and comments. No Reddit login needed.
+              The reliable way: sign in with Reddit once and your history imports automatically.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => window.location.assign("/api/connect/reddit")}
+              style={{
+                background: "#FF4500",
+                border: "none",
+                borderRadius: "9999px",
+                color: "white",
+                cursor: "pointer",
+                fontWeight: 700,
+                padding: "0.8rem 1.5rem",
+                width: "100%",
+                fontSize: "0.95rem",
+              }}
+            >
+              Connect Reddit — one-click import
+            </button>
+
+            <div style={{ opacity: 0.5, fontSize: "0.82rem", margin: "1rem 0 0.6rem" }}>
+              Or try by username (public posts only — Reddit sometimes blocks this):
             </div>
 
             <div style={{ display: "flex", gap: "0.75rem" }}>
