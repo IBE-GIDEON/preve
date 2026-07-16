@@ -59,7 +59,8 @@ export default function CollectionsPage() {
         >
           <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "0.4rem" }}>Collections</h1>
           <p className="settings-muted" style={{ marginBottom: "1.75rem" }}>
-            Group posts and comments from your archive into themed collections.
+            Playlists for your posts. Find something great in Search, hit &ldquo;Add to collection&rdquo;, and
+            it&rsquo;s never buried again — make a collection public to share it as one link.
           </p>
 
           <section className="settings-section">
@@ -85,7 +86,12 @@ export default function CollectionsPage() {
             <div className="settings-section" style={{ textAlign: "center", padding: "2.5rem 1.5rem" }}>
               <FolderOpen size={28} style={{ opacity: 0.4 }} />
               <p style={{ fontWeight: 600, marginTop: "0.75rem" }}>No collections yet</p>
-              <p className="settings-muted">Create your first collection above.</p>
+              <p className="settings-muted" style={{ maxWidth: "420px", margin: "0.35rem auto 0" }}>
+                Creators use them for things like &ldquo;My best threads&rdquo;, &ldquo;Client wins&rdquo;, or
+                &ldquo;Ideas to repurpose&rdquo;. Start one above, or open any post in{" "}
+                <Link href="/dashboard" style={{ color: "#F05522" }}>Search</Link> and hit
+                &ldquo;Add to collection&rdquo;.
+              </p>
             </div>
           ) : (
             <div className="collections-grid">

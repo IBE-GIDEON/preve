@@ -29,6 +29,14 @@ import {
   loadArchivePosts,
   toggleArchiveItemSaved,
 } from "../../lib/archive/client";
+import {
+  addItemToCollection,
+  createCollection,
+  getCollectionIdsForItem,
+  listCollections,
+  removeItemFromCollection,
+  type Collection,
+} from "../../lib/collections/client";
 
 // Shown only before any content is imported — once the archive has items,
 // chips are mined from the user's own posts (lib/search/suggestions).
@@ -69,6 +77,12 @@ export default function DashboardPage() {
   const [archiveLoading, setArchiveLoading] = useState(true);
   const [archiveMessage, setArchiveMessage] = useState("");
   const [preveState, setPreveState] = useState<PreveState>(DEFAULT_PREVE_STATE);
+  const [collectionsList, setCollectionsList] = useState<Collection[]>([]);
+  const [postCollectionIds, setPostCollectionIds] = useState<string[]>([]);
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [collectionBusy, setCollectionBusy] = useState<string | null>(null);
+  const [collectionError, setCollectionError] = useState("");
+  const [newCollectionName, setNewCollectionName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -101,6 +115,19 @@ export default function DashboardPage() {
     setCopied(false);
     setGeneratedRewrite("");
     setAiError("");
+  }, [selectedPost?.id]);
+
+  // Which collections already hold the selected post (drives the ✓ states).
+  useEffect(() => {
+    setCollectionsOpen(false);
+    setCollectionError("");
+    if (!selectedPost) {
+      setPostCollectionIds([]);
+      return;
+    }
+    getCollectionIdsForItem(selectedPost.id)
+      .then(setPostCollectionIds)
+      .catch(() => setPostCollectionIds([]));
   }, [selectedPost?.id]);
 
   async function runAi(action: string, format?: string) {
@@ -197,6 +224,61 @@ export default function DashboardPage() {
     setSearchValue(selectedPost.topics.slice(0, 2).join(" "));
     setSelectedPost(null);
     inputRef.current?.focus();
+  }
+
+  async function handleToggleCollectionsPanel() {
+    const opening = !collectionsOpen;
+    setCollectionsOpen(opening);
+    if (opening && collectionsList.length === 0) {
+      try {
+        setCollectionsList(await listCollections());
+      } catch (err) {
+        setCollectionError(err instanceof Error ? err.message : "Couldn't load collections.");
+      }
+    }
+  }
+
+  async function handleToggleInCollection(collectionId: string) {
+    if (!selectedPost || collectionBusy) return;
+    setCollectionBusy(collectionId);
+    setCollectionError("");
+    try {
+      const inIt = postCollectionIds.includes(collectionId);
+      if (inIt) {
+        await removeItemFromCollection(collectionId, selectedPost.id);
+        setPostCollectionIds((prev) => prev.filter((id) => id !== collectionId));
+      } else {
+        await addItemToCollection(collectionId, selectedPost.id);
+        setPostCollectionIds((prev) => [...prev, collectionId]);
+      }
+      setCollectionsList((prev) =>
+        prev.map((c) =>
+          c.id === collectionId ? { ...c, itemCount: Math.max(0, c.itemCount + (inIt ? -1 : 1)) } : c,
+        ),
+      );
+    } catch (err) {
+      setCollectionError(err instanceof Error ? err.message : "Couldn't update the collection.");
+    } finally {
+      setCollectionBusy(null);
+    }
+  }
+
+  async function handleCreateCollectionAndAdd() {
+    const name = newCollectionName.trim();
+    if (!name || !selectedPost || collectionBusy) return;
+    setCollectionBusy("new");
+    setCollectionError("");
+    try {
+      const created = await createCollection(name, "");
+      await addItemToCollection(created.id, selectedPost.id);
+      setCollectionsList((prev) => [{ ...created, itemCount: 1 }, ...prev]);
+      setPostCollectionIds((prev) => [...prev, created.id]);
+      setNewCollectionName("");
+    } catch (err) {
+      setCollectionError(err instanceof Error ? err.message : "Couldn't create the collection.");
+    } finally {
+      setCollectionBusy(null);
+    }
   }
 
   const visibleSuggestions = [];
@@ -607,10 +689,88 @@ export default function DashboardPage() {
                 <button onClick={handleSavePost} className="action-btn">
                   {selectedPostSaved ? "Saved to Favorites" : "Save to Favorites"}
                 </button>
+                <button onClick={handleToggleCollectionsPanel} className="action-btn">
+                  {postCollectionIds.length > 0
+                    ? `In ${postCollectionIds.length} ${postCollectionIds.length === 1 ? "collection" : "collections"}`
+                    : "Add to collection"}
+                </button>
                 <button onClick={handleFindSimilar} className="action-btn">
                   Find similar posts
                 </button>
               </div>
+
+              {collectionsOpen && (
+                <div
+                  style={{
+                    marginTop: "0.75rem",
+                    border: "1px solid rgba(0,0,0,0.1)",
+                    borderRadius: "12px",
+                    padding: "0.75rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.35rem",
+                  }}
+                >
+                  {collectionsList.length === 0 && (
+                    <p style={{ fontSize: "0.82rem", opacity: 0.6, margin: "0 0 0.25rem" }}>
+                      Collections are playlists for your posts — name one below to start.
+                    </p>
+                  )}
+                  {collectionsList.map((collection) => {
+                    const inIt = postCollectionIds.includes(collection.id);
+                    return (
+                      <button
+                        key={collection.id}
+                        onClick={() => handleToggleInCollection(collection.id)}
+                        disabled={collectionBusy !== null}
+                        className="context-row"
+                        style={{ color: "var(--foreground)", justifyContent: "space-between", opacity: collectionBusy === collection.id ? 0.5 : 1 }}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {collection.name}
+                        </span>
+                        <span style={{ color: inIt ? "#16a34a" : "var(--foreground)", opacity: inIt ? 1 : 0.35, fontWeight: 700 }}>
+                          {inIt ? "✓" : "+"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.35rem" }}>
+                    <input
+                      value={newCollectionName}
+                      maxLength={60}
+                      onChange={(event) => setNewCollectionName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void handleCreateCollectionAndAdd();
+                      }}
+                      placeholder="New collection…"
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        border: "1px solid var(--input-border)",
+                        borderRadius: "8px",
+                        background: "var(--input-bg)",
+                        color: "var(--input-text)",
+                        font: "inherit",
+                        fontSize: "0.85rem",
+                        outline: "none",
+                        padding: "0.45rem 0.6rem",
+                      }}
+                    />
+                    <button
+                      onClick={() => void handleCreateCollectionAndAdd()}
+                      disabled={!newCollectionName.trim() || collectionBusy !== null}
+                      className="settings-ghost-btn"
+                      style={{ opacity: !newCollectionName.trim() ? 0.5 : 1 }}
+                    >
+                      Create
+                    </button>
+                  </div>
+                  {collectionError && (
+                    <p style={{ color: "#F05522", fontSize: "0.8rem", margin: "0.25rem 0 0" }}>{collectionError}</p>
+                  )}
+                </div>
+              )}
 
               {aiError && (
                 <p style={{ marginTop: "1rem", color: "#F05522", fontSize: "0.85rem", lineHeight: 1.4 }}>{aiError}</p>
