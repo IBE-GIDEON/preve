@@ -5,7 +5,9 @@ import { motion } from "framer-motion";
 import type { Platform, Post, PostKind } from "../../data/mockPosts";
 import { getPlatformColor } from "../../data/mockPosts";
 import { PLATFORM_ORDER } from "../../lib/preveState";
+import { PlatformIcon } from "../../../components/PlatformIcon";
 import { getArchiveStats, importManualArchive, loadArchivePosts } from "../../../lib/archive/client";
+import { getConnectPlatform } from "../../../lib/connect-platforms";
 import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
 import { parseRedditExportCsv } from "../../../lib/reddit-export";
@@ -38,8 +40,9 @@ function getPlatformName(platform: Platform) {
   return platform === "X" ? "X (Twitter)" : platform;
 }
 
-function getPlatformMark(platform: Platform) {
-  return platform === "LinkedIn" ? "in" : platform.charAt(0);
+function getPlatformIcon(platform: Platform) {
+  const platformId = platform === "X" ? "x" : platform.toLowerCase();
+  return getConnectPlatform(platformId)?.icon;
 }
 
 function countImportItems(rawText: string) {
@@ -86,6 +89,7 @@ export default function ImportsPage() {
   const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
   const importCount = countImportItems(rawText);
   const connectedPlatforms = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0).length;
+  const redditIcon = getPlatformIcon("Reddit");
 
   useEffect(() => {
     void refreshArchive();
@@ -267,7 +271,7 @@ export default function ImportsPage() {
                   fontWeight: 700,
                 }}
               >
-                R
+                {redditIcon && <PlatformIcon icon={redditIcon} color="#ffffff" size={17} title="Reddit" />}
               </div>
               <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Reddit</h2>
             </div>
@@ -436,6 +440,7 @@ export default function ImportsPage() {
             {PLATFORM_ORDER.map((item, index) => {
               const count = totals.platformCounts[item];
               const isConnected = count > 0;
+              const platformIcon = getPlatformIcon(item);
 
               return (
                 <div
@@ -469,7 +474,7 @@ export default function ImportsPage() {
                           fontSize: "1.2rem",
                         }}
                       >
-                        {getPlatformMark(item)}
+                        {platformIcon && <PlatformIcon icon={platformIcon} color="#ffffff" size={20} title={getPlatformName(item)} />}
                       </div>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: "1.1rem" }}>{getPlatformName(item)}</div>
