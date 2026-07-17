@@ -11,7 +11,6 @@ import {
   type PostKind,
 } from "../data/mockPosts";
 import { searchArchive } from "../../lib/search/client";
-import { deriveSuggestions } from "../../lib/search/suggestions";
 import { buildEmbeddings, semanticSearch } from "../../lib/semantic/client";
 import {
   addSavedSearch,
@@ -38,16 +37,6 @@ import {
   type Collection,
 } from "../../lib/collections/client";
 
-// Shown only before any content is imported — once the archive has items,
-// chips are mined from the user's own posts (lib/search/suggestions).
-const FALLBACK_SUGGESTIONS = [
-  "your favorite topic",
-  "something you posted",
-  "a comment you loved",
-  "your best advice",
-  "an old idea",
-];
-
 const numberFormatter = new Intl.NumberFormat("en-US");
 
 function formatNumber(value: number) {
@@ -66,7 +55,6 @@ export default function DashboardPage() {
   const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
   const [indexing, setIndexing] = useState(false);
   const embeddedRef = useRef(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copied, setCopied] = useState(false);
   const [generatedRewrite, setGeneratedRewrite] = useState("");
@@ -94,12 +82,6 @@ export default function DashboardPage() {
     loadArchive();
   }, []);
 
-  // Chips come from the user's own archive; generic list only pre-import.
-  const suggestions = useMemo(() => {
-    const derived = deriveSuggestions(archivePosts);
-    return derived.length >= 3 ? derived : FALLBACK_SUGGESTIONS;
-  }, [archivePosts]);
-
   // Only platforms the user actually has content on (dropdowns stay honest).
   const platformsWithContent = useMemo(
     () => PLATFORM_ORDER.filter((platform) => archivePosts.some((post) => post.platform === platform)),
@@ -112,14 +94,6 @@ export default function DashboardPage() {
       setFilterPlatform("all");
     }
   }, [filterPlatform, platformsWithContent, archivePosts.length]);
-
-  useEffect(() => {
-    if (searchValue !== "") return;
-    const interval = window.setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % suggestions.length);
-    }, 3000);
-    return () => window.clearInterval(interval);
-  }, [searchValue, suggestions.length]);
 
   useEffect(() => {
     if (searchValue === "") setSelectedPost(null);
@@ -203,12 +177,6 @@ export default function DashboardPage() {
     });
   }
 
-  function handleSuggestionClick(suggestion: string) {
-    setSearchValue(suggestion);
-    setSelectedPost(null);
-    inputRef.current?.focus();
-    updatePreveState((state) => saveSearchQuery(state, suggestion));
-  }
 
   async function handleCopy(value: string) {
     await navigator.clipboard.writeText(value);
@@ -297,11 +265,6 @@ export default function DashboardPage() {
     } finally {
       setCollectionBusy(null);
     }
-  }
-
-  const visibleSuggestions = [];
-  for (let i = 0; i < Math.min(3, suggestions.length); i += 1) {
-    visibleSuggestions.push(suggestions[(currentIndex + i) % suggestions.length]);
   }
 
   // Debounce the query so search-as-you-type hits the server at most every 300ms.
@@ -766,9 +729,6 @@ export default function DashboardPage() {
                 <button onClick={() => runAi("repurpose", "X thread")} disabled={aiLoading} className="action-btn">
                   Repurpose → Thread
                 </button>
-                <button onClick={() => handleCopy(generatedRewrite || selectedPost.content)} className="action-btn">
-                  {copied ? "Copied" : generatedRewrite ? "Copy result" : "Copy content"}
-                </button>
                 <button
                   onClick={() => selectedPost.url && window.open(selectedPost.url, "_blank", "noopener,noreferrer")}
                   className="action-btn"
@@ -872,12 +832,48 @@ export default function DashboardPage() {
                     border: "1px solid rgba(0,0,0,0.1)",
                     borderRadius: "12px",
                     padding: "1rem",
-                    whiteSpace: "pre-wrap",
-                    fontSize: "0.9rem",
-                    lineHeight: 1.5,
                   }}
                 >
-                  {generatedRewrite}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.5rem",
+                      marginBottom: "0.65rem",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        opacity: 0.5,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      AI result
+                    </span>
+                    <button
+                      onClick={() => handleCopy(generatedRewrite)}
+                      style={{
+                        border: "1px solid var(--input-border)",
+                        background: "transparent",
+                        color: "var(--foreground)",
+                        borderRadius: "8px",
+                        padding: "0.35rem 0.85rem",
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {copied ? "Copied ✓" : "Copy"}
+                    </button>
+                  </div>
+                  <div style={{ whiteSpace: "pre-wrap", fontSize: "0.9rem", lineHeight: 1.5 }}>
+                    {generatedRewrite}
+                  </div>
                 </div>
               )}
 
@@ -911,28 +907,7 @@ export default function DashboardPage() {
               exit={{ opacity: 0, x: 20, transition: { duration: 0.2 } }}
               transition={{ duration: 0.4 }}
             >
-              <h3 className="suggestions-heading">Try asking</h3>
-              <div className="chat-bubble-container">
-                <AnimatePresence mode="popLayout">
-                  {visibleSuggestions.map((suggestion) => (
-                    <motion.div
-                      layout
-                      key={suggestion}
-                      className="chat-suggestion-row"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      exit={{ opacity: 0, y: -20, filter: "blur(4px)", transition: { duration: 0.3 } }}
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {suggestion}
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-
-              <div style={{ marginTop: "3rem" }}>
+              <div>
                 <h3 className="suggestions-heading" style={{ marginBottom: "1rem" }}>
                   Connected Platforms
                 </h3>
