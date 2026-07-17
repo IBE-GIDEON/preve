@@ -668,7 +668,23 @@ export default function DashboardPage() {
         </AnimatePresence>
       </main>
 
-      <aside className="dashboard-right-sidebar">
+      {/* Mobile: tapping a post floats these actions up as a bottom sheet
+          instead of burying them below the results. Backdrop dismisses it. */}
+      {selectedPost && (
+        <div className="sheet-backdrop" onClick={() => setSelectedPost(null)} aria-hidden="true" />
+      )}
+
+      <aside className={`dashboard-right-sidebar${selectedPost ? " sheet-open" : ""}`}>
+        {selectedPost && (
+          <button
+            type="button"
+            className="sheet-grabber"
+            onClick={() => setSelectedPost(null)}
+            aria-label="Close actions"
+          >
+            <span className="sheet-grabber-pill" />
+          </button>
+        )}
         <AnimatePresence mode="wait">
           {selectedPost ? (
             <motion.div
@@ -677,9 +693,10 @@ export default function DashboardPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
             >
-              <h3 className="suggestions-heading" style={{ marginBottom: "1.5rem" }}>
+              <h3 className="suggestions-heading" style={{ marginBottom: "0.85rem" }}>
                 AI Actions
               </h3>
+              <div className="sheet-post-preview">{selectedPost.content}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <button onClick={() => runAi("summarize")} disabled={aiLoading} className="action-btn">
                   {aiLoading ? "Working…" : "Summarize"}

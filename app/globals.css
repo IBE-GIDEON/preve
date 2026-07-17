@@ -4520,3 +4520,87 @@ textarea {
   border-radius: 16px;
   padding: 1.75rem 1.5rem;
 }
+
+/* ── Mobile bottom sheet for AI actions (search page) ──────────────────
+   Desktop keeps the side panel; on phones the same actions float up from
+   the bottom when a post is selected, so no scrolling to reach them. */
+.sheet-backdrop {
+  display: none;
+}
+
+.dashboard-right-sidebar .sheet-grabber {
+  display: none;
+}
+
+.sheet-post-preview {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  opacity: 0.6;
+  margin-bottom: 0.9rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+  .sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: rgba(0, 0, 0, 0.45);
+    animation: sheet-fade 0.2s ease;
+  }
+
+  /* The AI-actions panel becomes a bottom sheet (higher specificity than
+     the M6 stacked rule, so it wins without !important). */
+  .dashboard-right-sidebar.sheet-open {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    max-height: 82dvh;
+    border-top: none;
+    border-radius: 18px 18px 0 0;
+    background: var(--background);
+    box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.28);
+    overflow-y: auto;
+    padding: 0 1.15rem calc(1.5rem + env(safe-area-inset-bottom));
+    animation: sheet-up 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .dashboard-right-sidebar.sheet-open .sheet-grabber {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: sticky;
+    top: 0;
+    width: 100%;
+    padding: 0.65rem 0 0.55rem;
+    margin: 0;
+    border: none;
+    background: var(--background);
+    cursor: pointer;
+    z-index: 1;
+  }
+
+  .sheet-grabber-pill {
+    width: 40px;
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--foreground);
+    opacity: 0.25;
+  }
+}
