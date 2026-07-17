@@ -383,6 +383,118 @@ export default function DashboardPage() {
   const similarPosts = selectedPost ? getSimilarArchivePosts(archivePosts, selectedPost) : [];
   const selectedPostSaved = selectedPost ? savedPostIds.includes(selectedPost.id) : false;
 
+  // Browse mode: with no query, the page shows the whole archive (newest
+  // first, already ordered by the loader), narrowed by the same filters.
+  const filteredArchive = archivePosts.filter((post) => {
+    if (filterPlatform !== "all" && post.platform !== filterPlatform) return false;
+    if (filterKind !== "all" && post.kind !== filterKind) return false;
+    if (filterDays !== "all") {
+      const cutoff = Date.now() - Number(filterDays) * 86_400_000;
+      if (!post.publishedAt || new Date(post.publishedAt).getTime() < cutoff) return false;
+    }
+    return true;
+  });
+
+  function renderPostCard(post: Post) {
+    return (
+      <motion.div
+        key={post.id}
+        layoutId={`post-${post.id}`}
+        onClick={() => setSelectedPost(post)}
+        style={{
+          background: "var(--background)",
+          border: "1px solid rgba(0,0,0,0.1)",
+          borderRadius: "12px",
+          padding: "1.5rem",
+          marginBottom: "1rem",
+          cursor: "pointer",
+        }}
+        className="hover-card"
+      >
+        <div
+          style={{
+            fontSize: "0.8rem",
+            opacity: 0.5,
+            marginBottom: "0.5rem",
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ color: getPlatformColor(post.platform), fontWeight: 600 }}>{post.platform}</span>
+          <span>&bull;</span>
+          <span>{post.kind}</span>
+          <span>&bull;</span>
+          <span>{post.date}</span>
+        </div>
+        <div
+          style={{
+            fontWeight: 500,
+            lineHeight: 1.5,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {post.content}
+        </div>
+      </motion.div>
+    );
+  }
+
+  const filterBar = (
+    <div className="search-filter-bar">
+      <select
+        value={filterPlatform}
+        onChange={(event) => setFilterPlatform(event.target.value as Platform | "all")}
+        className="search-filter-select"
+        aria-label="Filter by platform"
+      >
+        <option value="all">All platforms</option>
+        {platformsWithContent.map((platform) => (
+          <option key={platform} value={platform}>{platform}</option>
+        ))}
+      </select>
+      <select
+        value={filterKind}
+        onChange={(event) => setFilterKind(event.target.value as PostKind | "all")}
+        className="search-filter-select"
+        aria-label="Filter by type"
+      >
+        <option value="all">All types</option>
+        {(["Post", "Comment", "Thread", "Article"] as PostKind[]).map((kind) => (
+          <option key={kind} value={kind}>{kind}</option>
+        ))}
+      </select>
+      <select
+        value={filterDays}
+        onChange={(event) => setFilterDays(event.target.value as "all" | "7" | "30" | "90" | "365")}
+        className="search-filter-select"
+        aria-label="Filter by date"
+      >
+        <option value="all">All time</option>
+        <option value="7">Past week</option>
+        <option value="30">Past month</option>
+        <option value="90">Past 3 months</option>
+        <option value="365">Past year</option>
+      </select>
+      {activeFilterCount > 0 && (
+        <button
+          type="button"
+          className="search-filter-clear"
+          onClick={() => {
+            setFilterPlatform("all");
+            setFilterKind("all");
+            setFilterDays("all");
+          }}
+        >
+          Clear ({activeFilterCount})
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="dashboard-content-area">
       <main className="dashboard-main" style={{ paddingTop: "1.5rem" }}>
@@ -520,55 +632,7 @@ export default function DashboardPage() {
               exit={{ opacity: 0, y: -20 }}
               style={{ width: "100%", maxWidth: "640px", marginTop: "3rem" }}
             >
-              <div className="search-filter-bar">
-                <select
-                  value={filterPlatform}
-                  onChange={(event) => setFilterPlatform(event.target.value as Platform | "all")}
-                  className="search-filter-select"
-                  aria-label="Filter by platform"
-                >
-                  <option value="all">All platforms</option>
-                  {platformsWithContent.map((platform) => (
-                    <option key={platform} value={platform}>{platform}</option>
-                  ))}
-                </select>
-                <select
-                  value={filterKind}
-                  onChange={(event) => setFilterKind(event.target.value as PostKind | "all")}
-                  className="search-filter-select"
-                  aria-label="Filter by type"
-                >
-                  <option value="all">All types</option>
-                  {(["Post", "Comment", "Thread", "Article"] as PostKind[]).map((kind) => (
-                    <option key={kind} value={kind}>{kind}</option>
-                  ))}
-                </select>
-                <select
-                  value={filterDays}
-                  onChange={(event) => setFilterDays(event.target.value as "all" | "7" | "30" | "90" | "365")}
-                  className="search-filter-select"
-                  aria-label="Filter by date"
-                >
-                  <option value="all">All time</option>
-                  <option value="7">Past week</option>
-                  <option value="30">Past month</option>
-                  <option value="90">Past 3 months</option>
-                  <option value="365">Past year</option>
-                </select>
-                {activeFilterCount > 0 && (
-                  <button
-                    type="button"
-                    className="search-filter-clear"
-                    onClick={() => {
-                      setFilterPlatform("all");
-                      setFilterKind("all");
-                      setFilterDays("all");
-                    }}
-                  >
-                    Clear ({activeFilterCount})
-                  </button>
-                )}
-              </div>
+              {filterBar}
 
               <h4 style={{ opacity: 0.5, marginBottom: "1rem" }}>
                 {serverLoading
@@ -588,54 +652,33 @@ export default function DashboardPage() {
                   No matching posts found. Import more content or try another term.
                 </div>
               ) : (
-                searchResults.map((post) => (
-                  <motion.div
-                    key={post.id}
-                    layoutId={`post-${post.id}`}
-                    onClick={() => setSelectedPost(post)}
-                    style={{
-                      background: "var(--background)",
-                      border: "1px solid rgba(0,0,0,0.1)",
-                      borderRadius: "12px",
-                      padding: "1.5rem",
-                      marginBottom: "1rem",
-                      cursor: "pointer",
-                    }}
-                    className="hover-card"
-                  >
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        opacity: 0.5,
-                        marginBottom: "0.5rem",
-                        display: "flex",
-                        gap: "0.5rem",
-                        alignItems: "center",
-                      }}
-                    >
-                      <span style={{ color: getPlatformColor(post.platform), fontWeight: 600 }}>{post.platform}</span>
-                      <span>&bull;</span>
-                      <span>{post.kind}</span>
-                      <span>&bull;</span>
-                      <span>{post.date}</span>
-                    </div>
-                    <div
-                      style={{
-                        fontWeight: 500,
-                        lineHeight: 1.5,
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {post.content}
-                    </div>
-                  </motion.div>
-                ))
+                searchResults.map((post) => renderPostCard(post))
               )}
             </motion.div>
-          ) : archiveLoading || archivePosts.length === 0 || archiveMessage ? (
+          ) : archivePosts.length > 0 ? (
+            <motion.div
+              key="browse-view"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              style={{ width: "100%", maxWidth: "640px", marginTop: "3rem" }}
+            >
+              {filterBar}
+
+              <h4 style={{ opacity: 0.5, marginBottom: "1rem" }}>
+                {filteredArchive.length.toLocaleString()} of {archivePosts.length.toLocaleString()} post
+                {archivePosts.length === 1 ? "" : "s"} in your archive · start typing to search
+              </h4>
+
+              {filteredArchive.length === 0 ? (
+                <div style={{ textAlign: "center", opacity: 0.5, marginTop: "3rem" }}>
+                  No posts match these filters.
+                </div>
+              ) : (
+                filteredArchive.map((post) => renderPostCard(post))
+              )}
+            </motion.div>
+          ) : (
             <motion.div
               key="empty-view"
               initial={{ opacity: 0, y: 20 }}
@@ -666,7 +709,7 @@ export default function DashboardPage() {
                 </Link>
               )}
             </motion.div>
-          ) : null}
+          )}
         </AnimatePresence>
       </main>
 
