@@ -498,35 +498,37 @@ export default function DashboardPage() {
   return (
     <div className="dashboard-content-area">
       <main className="dashboard-main" style={{ paddingTop: "1.5rem" }}>
-        <div className="search-wrapper" style={{ width: "100%", maxWidth: "640px", transition: "all 0.3s ease" }}>
-          <input
-            ref={inputRef}
-            type="search"
-            placeholder="Search Everything You've Ever Posted"
-            className="search-input-animated"
-            value={searchValue}
-            onChange={(event) => {
-              setSearchValue(event.target.value);
-              setSelectedPost(null);
-            }}
-            style={{ padding: "1rem 1.5rem", fontSize: "1.1rem" }}
-          />
-        </div>
+        <div className="search-sticky">
+          <div className="search-wrapper" style={{ width: "100%", maxWidth: "640px", transition: "all 0.3s ease" }}>
+            <input
+              ref={inputRef}
+              type="search"
+              placeholder="Search Everything You've Ever Posted"
+              className="search-input-animated"
+              value={searchValue}
+              onChange={(event) => {
+                setSearchValue(event.target.value);
+                setSelectedPost(null);
+              }}
+              style={{ padding: "1rem 1.5rem", fontSize: "1.1rem" }}
+            />
+          </div>
 
-        <div className="search-mode-row">
-          {(["keyword", "semantic"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setSearchMode(mode)}
-              className={`search-mode-btn${searchMode === mode ? " active" : ""}`}
-            >
-              {mode === "semantic" ? "✨ Semantic" : "Keyword"}
-            </button>
-          ))}
-          {searchMode === "semantic" && indexing && (
-            <span className="search-mode-hint">Building semantic index…</span>
-          )}
+          <div className="search-mode-row">
+            {(["keyword", "semantic"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setSearchMode(mode)}
+                className={`search-mode-btn${searchMode === mode ? " active" : ""}`}
+              >
+                {mode === "semantic" ? "✨ Semantic" : "Keyword"}
+              </button>
+            ))}
+            {searchMode === "semantic" && indexing && (
+              <span className="search-mode-hint">Building semantic index…</span>
+            )}
+          </div>
         </div>
 
         <AnimatePresence mode="wait">
