@@ -4604,3 +4604,11 @@ textarea {
     opacity: 0.25;
   }
 }
+
+/* AI actions remaining-this-window badge */
+.ai-usage-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.55;
+  white-space: nowrap;
+}

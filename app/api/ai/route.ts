@@ -10,16 +10,32 @@ const usage = new Map<string, number[]>();
 const WINDOW_MS = 10 * 60_000;
 const MAX_PER_WINDOW = 30;
 
-function isRateLimited(userId: string): boolean {
+interface UsageInfo {
+  limited: boolean;
+  remaining: number;
+  limit: number;
+  resetInSeconds: number;
+}
+
+// Records this attempt and reports how much of the window is left, so the UI
+// can show the user their remaining AI actions.
+function recordUsage(userId: string): UsageInfo {
   const now = Date.now();
   const stamps = (usage.get(userId) ?? []).filter((t) => now - t < WINDOW_MS);
+  const resetIn = (list: number[]) =>
+    list.length ? Math.max(1, Math.ceil((WINDOW_MS - (now - list[0])) / 1000)) : Math.ceil(WINDOW_MS / 1000);
+
   if (stamps.length >= MAX_PER_WINDOW) {
     usage.set(userId, stamps);
-    return true;
+    return { limited: true, remaining: 0, limit: MAX_PER_WINDOW, resetInSeconds: resetIn(stamps) };
   }
   stamps.push(now);
   usage.set(userId, stamps);
-  return false;
+  return { limited: false, remaining: MAX_PER_WINDOW - stamps.length, limit: MAX_PER_WINDOW, resetInSeconds: resetIn(stamps) };
+}
+
+function usagePayload(info: UsageInfo) {
+  return { remaining: info.remaining, limit: info.limit, resetInSeconds: info.resetInSeconds };
 }
 
 const PROMPTS: Record<string, string> = {
@@ -39,9 +55,15 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  if (isRateLimited(data.user.id)) {
+
+  const usageInfo = recordUsage(data.user.id);
+  if (usageInfo.limited) {
+    const mins = Math.max(1, Math.round(usageInfo.resetInSeconds / 60));
     return NextResponse.json(
-      { error: "You're moving fast — give the AI a few minutes and try again." },
+      {
+        error: `You've used all ${usageInfo.limit} AI actions for now — resets in about ${mins} min.`,
+        usage: usagePayload(usageInfo),
+      },
       { status: 429 },
     );
   }
@@ -67,10 +89,10 @@ export async function POST(request: Request) {
 
   try {
     const result = await chatComplete(system, text);
-    return NextResponse.json({ result });
+    return NextResponse.json({ result, usage: usagePayload(usageInfo) });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "AI request failed." },
+      { error: error instanceof Error ? error.message : "AI request failed.", usage: usagePayload(usageInfo) },
       { status: 500 },
     );
   }

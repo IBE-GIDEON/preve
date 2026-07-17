@@ -72,6 +72,7 @@ export default function DashboardPage() {
   const [generatedRewrite, setGeneratedRewrite] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [aiUsage, setAiUsage] = useState<{ remaining: number; limit: number } | null>(null);
   const [archivePosts, setArchivePosts] = useState<Post[]>([]);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
   const [archiveLoading, setArchiveLoading] = useState(true);
@@ -155,6 +156,7 @@ export default function DashboardPage() {
         body: JSON.stringify({ action, format, text: selectedPost.content }),
       });
       const data = await res.json().catch(() => ({}));
+      if (data.usage) setAiUsage({ remaining: data.usage.remaining, limit: data.usage.limit });
       if (!res.ok) throw new Error(data.error || "AI request failed.");
       setGeneratedRewrite(data.result || "");
     } catch (error) {
@@ -693,9 +695,18 @@ export default function DashboardPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
             >
-              <h3 className="suggestions-heading" style={{ marginBottom: "0.85rem" }}>
-                AI Actions
-              </h3>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.85rem" }}>
+                <h3 className="suggestions-heading" style={{ margin: 0 }}>AI Actions</h3>
+                {aiUsage && (
+                  <span
+                    className="ai-usage-badge"
+                    style={{ color: aiUsage.remaining <= 5 ? "#d97706" : undefined }}
+                    title="AI actions reset every 10 minutes"
+                  >
+                    {aiUsage.remaining}/{aiUsage.limit} left
+                  </span>
+                )}
+              </div>
               <div className="sheet-post-preview">{selectedPost.content}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 <button onClick={() => runAi("summarize")} disabled={aiLoading} className="action-btn">
