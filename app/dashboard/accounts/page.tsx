@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PlatformIcon } from "../../../components/PlatformIcon";
 import { CONNECT_PLATFORMS } from "../../../lib/connect-platforms";
+import { isRedditEnabled } from "../../../lib/flags";
 import {
   connectAccount,
   disconnectAccount,
@@ -143,6 +144,10 @@ export default function AccountsPage() {
                 const connected = account?.status === "connected" || account?.status === "importing";
                 const status = account ? STATUS_STYLES[account.status] : null;
                 const isBusy = busy === platform.id;
+                // Reddit is locked until API keys exist (see lib/flags).
+                const locked = platform.id === "reddit" && !isRedditEnabled();
+                const ready = platform.ready && !locked;
+                const oauthStart = locked ? undefined : platform.oauthStart;
 
                 return (
                   <section key={platform.id} className="connect-card">
@@ -153,7 +158,7 @@ export default function AccountsPage() {
                       <div className="connect-card-info">
                         <div className="connect-card-name">
                           {platform.label}
-                          {!platform.ready && <span className="account-soon">Soon</span>}
+                          {!ready && <span className="account-soon">Soon</span>}
                         </div>
                         <div className="settings-muted connect-card-sub">
                           {connected
@@ -198,13 +203,13 @@ export default function AccountsPage() {
                       ) : (
                         <button className="settings-ghost-btn" disabled={isBusy}
                           onClick={() => {
-                            if (platform.oauthStart) {
-                              window.location.assign(platform.oauthStart);
+                            if (oauthStart) {
+                              window.location.assign(oauthStart);
                               return;
                             }
                             run(platform.id, () => connectAccount(platform.id, account?.handle ?? ""));
                           }}>
-                          {isBusy ? "Connecting..." : platform.oauthStart ? `Connect ${platform.label}` : "Connect"}
+                          {isBusy ? "Connecting..." : oauthStart ? `Connect ${platform.label}` : "Connect"}
                         </button>
                       )}
                     </div>

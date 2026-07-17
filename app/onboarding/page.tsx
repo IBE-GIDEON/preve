@@ -85,8 +85,8 @@ export default function OnboardingPage() {
                 }}
                 className="hover-card"
               >
-                <span style={{ color: "#FF4500", fontSize: "1.5rem", fontWeight: 700 }}>R</span>
-                Import from Reddit
+                <span style={{ color: "#F05522", fontSize: "1.5rem", fontWeight: 700 }}>+</span>
+                Connect a platform
               </motion.button>
 
               <motion.button
@@ -131,7 +131,7 @@ export default function OnboardingPage() {
           >
             <div style={{ color: "#22c55e", fontSize: "3rem", marginBottom: "1rem" }}>&#10003;</div>
             <h2 style={{ fontSize: "2rem", fontWeight: 600, marginBottom: "0.75rem" }}>You're set</h2>
-            <p style={{ opacity: 0.55 }}>Taking you to import your Reddit…</p>
+            <p style={{ opacity: 0.55 }}>Taking you to connect your platforms…</p>
           </motion.div>
         )}
       </AnimatePresence>

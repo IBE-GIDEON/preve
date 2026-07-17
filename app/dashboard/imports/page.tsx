@@ -10,6 +10,7 @@ import { getArchiveStats, importManualArchive, loadArchivePostsCached } from "..
 import { getConnectPlatform } from "../../../lib/connect-platforms";
 import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 import { isValidBlueskyHandle, normalizeBlueskyHandle } from "../../../lib/bluesky-shared";
+import { isRedditEnabled } from "../../../lib/flags";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
 import { parseRedditExportCsv } from "../../../lib/reddit-export";
 import {
@@ -361,6 +362,7 @@ export default function ImportsPage() {
         >
           <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "2rem" }}>Imports</h1>
 
+          {isRedditEnabled() && (
           <form
             onSubmit={handleRedditImport}
             style={{
@@ -483,6 +485,7 @@ export default function ImportsPage() {
               )}
             </div>
           </form>
+          )}
 
           <form
             onSubmit={handleBlueskyImport}
