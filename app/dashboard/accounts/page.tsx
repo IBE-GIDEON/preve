@@ -175,7 +175,7 @@ export default function AccountsPage() {
                         <>
                           <button className="settings-ghost-btn" disabled={isBusy}
                             onClick={() => run(platform.id, async () => {
-                              if (platform.id === "reddit" || platform.id === "bluesky") {
+                              if (["reddit", "bluesky", "mastodon", "rss"].includes(platform.id)) {
                                 const res = await fetch(`/api/import/${platform.id}`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },

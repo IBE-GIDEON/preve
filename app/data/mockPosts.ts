@@ -2,7 +2,7 @@
 // (Historically this file held mock data; that's gone — real content comes
 // from the user's imported archive in Supabase.)
 
-export type Platform = "Reddit" | "LinkedIn" | "X" | "Bluesky";
+export type Platform = "Reddit" | "LinkedIn" | "X" | "Bluesky" | "Mastodon" | "RSS";
 export type PostKind = "Post" | "Comment" | "Thread" | "Article";
 
 export interface Post {
@@ -31,6 +31,10 @@ export function getPlatformColor(platform: Platform) {
       return "#FF4500";
     case "Bluesky":
       return "#0085FF";
+    case "Mastodon":
+      return "#6364FF";
+    case "RSS":
+      return "#F26522";
     case "LinkedIn":
       return "#0A66C2";
     case "X":

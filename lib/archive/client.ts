@@ -3,7 +3,7 @@
 import type { Platform, Post, PostKind } from "../../app/data/mockPosts";
 import { createClient } from "../supabase/client";
 
-type DbPlatform = "reddit" | "x" | "linkedin" | "bluesky";
+type DbPlatform = "reddit" | "x" | "linkedin" | "bluesky" | "mastodon" | "rss";
 type DbKind = "post" | "comment" | "thread" | "article";
 
 export interface ArchiveItemRow {
@@ -41,6 +41,8 @@ const platformToDb: Record<Platform, DbPlatform> = {
   X: "x",
   LinkedIn: "linkedin",
   Bluesky: "bluesky",
+  Mastodon: "mastodon",
+  RSS: "rss",
 };
 
 const platformFromDb: Record<DbPlatform, Platform> = {
@@ -48,6 +50,8 @@ const platformFromDb: Record<DbPlatform, Platform> = {
   x: "X",
   linkedin: "LinkedIn",
   bluesky: "Bluesky",
+  mastodon: "Mastodon",
+  rss: "RSS",
 };
 
 const kindToDb: Record<PostKind, DbKind> = {
@@ -283,7 +287,7 @@ export function getArchiveStats(posts: Post[]) {
       counts[post.platform] += 1;
       return counts;
     },
-    { Reddit: 0, X: 0, LinkedIn: 0, Bluesky: 0 } satisfies Record<Platform, number>,
+    { Reddit: 0, X: 0, LinkedIn: 0, Bluesky: 0, Mastodon: 0, RSS: 0 } satisfies Record<Platform, number>,
   );
 
   return {

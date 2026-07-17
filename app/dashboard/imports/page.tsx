@@ -87,6 +87,12 @@ export default function ImportsPage() {
   const [blueskyHandle, setBlueskyHandle] = useState("");
   const [blueskyImporting, setBlueskyImporting] = useState(false);
   const [blueskyMessage, setBlueskyMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mastodonHandle, setMastodonHandle] = useState("");
+  const [mastodonImporting, setMastodonImporting] = useState(false);
+  const [mastodonMessage, setMastodonMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [rssUrl, setRssUrl] = useState("");
+  const [rssImporting, setRssImporting] = useState(false);
+  const [rssMessage, setRssMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const exportInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -95,6 +101,8 @@ export default function ImportsPage() {
   const connectedPlatforms = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0).length;
   const redditIcon = getPlatformIcon("Reddit");
   const blueskyIcon = getPlatformIcon("Bluesky");
+  const mastodonIcon = getPlatformIcon("Mastodon");
+  const rssIcon = getPlatformIcon("RSS");
   const platformsWithContent = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0);
 
   useEffect(() => {
@@ -215,6 +223,67 @@ export default function ImportsPage() {
       setBlueskyMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
     } finally {
       setBlueskyImporting(false);
+    }
+  }
+
+  async function handleMastodonImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!mastodonHandle.trim()) return;
+    setMastodonImporting(true);
+    setMastodonMessage(null);
+
+    try {
+      const res = await fetch("/api/import/mastodon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: mastodonHandle }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      const imported = data.imported ?? 0;
+      setMastodonMessage({
+        ok: true,
+        text:
+          imported === 0
+            ? "That account has no posts to import yet."
+            : `Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"}. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setMastodonMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setMastodonImporting(false);
+    }
+  }
+
+  async function handleRssImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!rssUrl.trim()) return;
+    setRssImporting(true);
+    setRssMessage(null);
+
+    try {
+      const res = await fetch("/api/import/rss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: rssUrl }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string; title?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      const imported = data.imported ?? 0;
+      const from = data.title ? ` from ${data.title}` : "";
+      setRssMessage({
+        ok: true,
+        text:
+          imported === 0
+            ? "No posts found in that feed."
+            : `Imported ${formatNumber(imported)} ${imported === 1 ? "post" : "posts"}${from}. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setRssMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setRssImporting(false);
     }
   }
 
@@ -484,6 +553,152 @@ export default function ImportsPage() {
                 }}
               >
                 {blueskyMessage.text}
+              </div>
+            )}
+          </form>
+
+          <form
+            onSubmit={handleMastodonImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#6364FF",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                {mastodonIcon && <PlatformIcon icon={mastodonIcon} color="#ffffff" size={17} title="Mastodon" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Mastodon</h2>
+            </div>
+            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+              Type your full handle — Mastodon&rsquo;s API is open. No login, no keys, no blocks.
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <input
+                value={mastodonHandle}
+                onChange={(event) => setMastodonHandle(event.target.value)}
+                placeholder="@you@mastodon.social"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...fieldStyle, flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={mastodonImporting || mastodonHandle.trim().length === 0}
+                style={{
+                  background: "#6364FF",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "white",
+                  cursor: mastodonImporting || mastodonHandle.trim().length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  opacity: mastodonImporting || mastodonHandle.trim().length === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1.4rem",
+                }}
+              >
+                {mastodonImporting ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            {mastodonMessage && (
+              <div
+                style={{
+                  color: mastodonMessage.ok ? "#16a34a" : "#F05522",
+                  marginTop: "0.75rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {mastodonMessage.text}
+              </div>
+            )}
+          </form>
+
+          <form
+            onSubmit={handleRssImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#F26522",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                {rssIcon && <PlatformIcon icon={rssIcon} color="#ffffff" size={16} title="RSS" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import a blog or newsletter</h2>
+            </div>
+            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+              Paste your Substack, Medium, or blog URL — we pull every post via its open RSS feed.
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <input
+                value={rssUrl}
+                onChange={(event) => setRssUrl(event.target.value)}
+                placeholder="yourname.substack.com"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...fieldStyle, flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={rssImporting || rssUrl.trim().length === 0}
+                style={{
+                  background: "#F26522",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "white",
+                  cursor: rssImporting || rssUrl.trim().length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  opacity: rssImporting || rssUrl.trim().length === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1.4rem",
+                }}
+              >
+                {rssImporting ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            {rssMessage && (
+              <div
+                style={{
+                  color: rssMessage.ok ? "#16a34a" : "#F05522",
+                  marginTop: "0.75rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {rssMessage.text}
               </div>
             )}
           </form>
