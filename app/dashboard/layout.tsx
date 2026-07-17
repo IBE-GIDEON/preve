@@ -6,7 +6,6 @@ import type { User } from "@supabase/supabase-js";
 import ThemeToggle from "../../components/ThemeToggle";
 import DashboardNav from "../../components/DashboardNav";
 import SidebarUser from "../../components/SidebarUser";
-import { getSupportUrl } from "../../lib/support";
 import { hasSupabasePublicEnv, isLocalPreviewAuthBypassEnabled } from "../../lib/supabase/env";
 import { createClient } from "../../lib/supabase/server";
 
@@ -46,16 +45,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
         <DashboardNav />
 
-        {getSupportUrl() && (
-          <a
-            href={getSupportUrl()!}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="sidebar-support-pill"
-          >
-            <Heart size={14} aria-hidden="true" /> Support preve
-          </a>
-        )}
+        <Link href="/support" className="sidebar-support-pill">
+          <Heart size={14} aria-hidden="true" /> Support preve
+        </Link>
 
         <div className="sidebar-footer">
           {user?.email && <SidebarUser email={user.email} name={fullName} avatarUrl={avatarUrl} />}
@@ -69,17 +61,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           preve
         </Link>
         <div className="dashboard-mobilebar-actions">
-          {getSupportUrl() && (
-            <a
-              href={getSupportUrl()!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mobilebar-support"
-              aria-label="Support preve"
-            >
-              <Heart size={18} aria-hidden="true" />
-            </a>
-          )}
+          <Link href="/support" className="mobilebar-support" aria-label="Support preve">
+            <Heart size={18} aria-hidden="true" />
+          </Link>
           <ThemeToggle />
           {user?.email && <SidebarUser email={user.email} name={fullName} avatarUrl={avatarUrl} />}
         </div>

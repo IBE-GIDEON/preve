@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "../../../components/ThemeToggle";
-import { getSupportUrl } from "../../../lib/support";
 import { getInitials } from "../../../lib/user";
 import { signOutAction, signOutAllDevicesAction } from "../../auth/actions";
 import { deleteAccount, exportUserData } from "./actions";
@@ -115,29 +114,25 @@ export default function SettingsView({ account, canDeleteAccount }: SettingsView
           </section>
 
           {/* Support preve */}
-          {getSupportUrl() && (
-            <section className="settings-section">
-              <h2 className="settings-section-title">Support preve</h2>
-              <div className="settings-row" style={{ borderTop: "none", paddingTop: 0 }}>
-                <div>
-                  <div className="settings-row-label">Become a founding supporter</div>
-                  <div className="settings-muted">
-                    preve is free while we grow. Supporters keep the servers on — and lock in{" "}
-                    <strong>50% off Pro, for life</strong>, when pricing starts.
-                  </div>
+          <section className="settings-section">
+            <h2 className="settings-section-title">Support preve</h2>
+            <div className="settings-row" style={{ borderTop: "none", paddingTop: 0 }}>
+              <div>
+                <div className="settings-row-label">Become a founding supporter</div>
+                <div className="settings-muted">
+                  preve is free while we grow. Supporters keep the servers on — and lock in{" "}
+                  <strong>50% off Pro, for life</strong>, when pricing starts.
                 </div>
-                <a
-                  href={getSupportUrl()!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="settings-save-btn"
-                  style={{ textDecoration: "none", whiteSpace: "nowrap", height: "40px", display: "inline-flex", alignItems: "center" }}
-                >
-                  ♥ Support
-                </a>
               </div>
-            </section>
-          )}
+              <Link
+                href="/support"
+                className="settings-save-btn"
+                style={{ textDecoration: "none", whiteSpace: "nowrap", height: "40px", display: "inline-flex", alignItems: "center" }}
+              >
+                ♥ Support
+              </Link>
+            </div>
+          </section>
 
           {/* Security */}
           <section className="settings-section">

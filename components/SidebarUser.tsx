@@ -4,7 +4,6 @@ import { ChevronsUpDown, Heart, LogOut, Settings, User as UserIcon } from "lucid
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { signOutAction } from "../app/auth/actions";
-import { getSupportUrl } from "../lib/support";
 import { getDisplayName, getInitials } from "../lib/user";
 
 interface SidebarUserProps {
@@ -56,18 +55,14 @@ export default function SidebarUser({ email, name, avatarUrl }: SidebarUserProps
           >
             <Settings size={15} /> Settings
           </Link>
-          {getSupportUrl() && (
-            <a
-              href={getSupportUrl()!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="sidebar-user-menu-item"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-            >
-              <Heart size={15} /> Support preve
-            </a>
-          )}
+          <Link
+            href="/support"
+            className="sidebar-user-menu-item"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+          >
+            <Heart size={15} /> Support preve
+          </Link>
           <form action={signOutAction}>
             <button type="submit" className="sidebar-user-menu-item danger" role="menuitem">
               <LogOut size={15} /> Sign out
