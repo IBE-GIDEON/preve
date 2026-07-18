@@ -24,6 +24,17 @@ interface ImportJobRow {
   completed_at: string | null;
 }
 
+/** Clear the signed-in user's import history (the log only — not the archive). */
+export async function clearImportJobs(): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in.");
+  const { error } = await supabase.from("import_jobs").delete().eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+}
+
 export async function getRecentImportJobs(limit = 5): Promise<ImportJob[]> {
   const supabase = createClient();
   const { data, error } = await supabase

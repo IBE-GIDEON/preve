@@ -8,7 +8,7 @@ import { PLATFORM_ORDER } from "../../lib/preveState";
 import { PlatformIcon } from "../../../components/PlatformIcon";
 import { getArchiveStats, importManualArchive, loadArchivePostsCached } from "../../../lib/archive/client";
 import { getConnectPlatform } from "../../../lib/connect-platforms";
-import { getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
+import { clearImportJobs, getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 import { isValidBlueskyHandle, normalizeBlueskyHandle } from "../../../lib/bluesky-shared";
 import { isRedditEnabled } from "../../../lib/flags";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
@@ -81,6 +81,7 @@ export default function ImportsPage() {
   const [importing, setImporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
+  const [clearingImports, setClearingImports] = useState(false);
   const [redditUsername, setRedditUsername] = useState("");
   const [redditImporting, setRedditImporting] = useState(false);
   const [redditMessage, setRedditMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -135,6 +136,19 @@ export default function ImportsPage() {
       setStatusMessage(error instanceof Error ? error.message : "Could not load your archive.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleClearImports() {
+    if (clearingImports) return;
+    setClearingImports(true);
+    try {
+      await clearImportJobs();
+      setImportJobs([]);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Couldn't clear the import log.");
+    } finally {
+      setClearingImports(false);
     }
   }
 
@@ -1169,7 +1183,27 @@ export default function ImportsPage() {
 
           {importJobs.length > 0 && (
             <div style={{ marginTop: "2rem" }}>
-              <h3 className="suggestions-heading" style={{ marginBottom: "1rem" }}>Recent imports</h3>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+                <h3 className="suggestions-heading" style={{ margin: 0 }}>Recent imports</h3>
+                <button
+                  type="button"
+                  onClick={handleClearImports}
+                  disabled={clearingImports}
+                  title="Clears this history log only — your imported posts stay in your archive."
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--foreground)",
+                    opacity: clearingImports ? 0.4 : 0.6,
+                    cursor: clearingImports ? "default" : "pointer",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    padding: 0,
+                  }}
+                >
+                  {clearingImports ? "Clearing…" : "Clear"}
+                </button>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
                 {importJobs.map((job) => (
                   <div key={job.id} style={{ fontSize: "0.85rem" }}>
