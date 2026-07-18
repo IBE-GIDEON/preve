@@ -3,7 +3,16 @@
 import type { Platform, Post, PostKind } from "../../app/data/mockPosts";
 import { createClient } from "../supabase/client";
 
-type DbPlatform = "reddit" | "x" | "linkedin" | "bluesky" | "mastodon" | "rss";
+type DbPlatform =
+  | "reddit"
+  | "x"
+  | "linkedin"
+  | "bluesky"
+  | "mastodon"
+  | "rss"
+  | "hackernews"
+  | "devto"
+  | "lemmy";
 type DbKind = "post" | "comment" | "thread" | "article";
 
 export interface ArchiveItemRow {
@@ -43,6 +52,9 @@ const platformToDb: Record<Platform, DbPlatform> = {
   Bluesky: "bluesky",
   Mastodon: "mastodon",
   RSS: "rss",
+  HackerNews: "hackernews",
+  Devto: "devto",
+  Lemmy: "lemmy",
 };
 
 const platformFromDb: Record<DbPlatform, Platform> = {
@@ -52,6 +64,9 @@ const platformFromDb: Record<DbPlatform, Platform> = {
   bluesky: "Bluesky",
   mastodon: "Mastodon",
   rss: "RSS",
+  hackernews: "HackerNews",
+  devto: "Devto",
+  lemmy: "Lemmy",
 };
 
 const kindToDb: Record<PostKind, DbKind> = {
@@ -287,7 +302,7 @@ export function getArchiveStats(posts: Post[]) {
       counts[post.platform] += 1;
       return counts;
     },
-    { Reddit: 0, X: 0, LinkedIn: 0, Bluesky: 0, Mastodon: 0, RSS: 0 } satisfies Record<Platform, number>,
+    { Reddit: 0, X: 0, LinkedIn: 0, Bluesky: 0, Mastodon: 0, RSS: 0, HackerNews: 0, Devto: 0, Lemmy: 0 } satisfies Record<Platform, number>,
   );
 
   return {

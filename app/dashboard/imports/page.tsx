@@ -94,6 +94,15 @@ export default function ImportsPage() {
   const [rssUrl, setRssUrl] = useState("");
   const [rssImporting, setRssImporting] = useState(false);
   const [rssMessage, setRssMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [hnUsername, setHnUsername] = useState("");
+  const [hnImporting, setHnImporting] = useState(false);
+  const [hnMessage, setHnMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [devtoUsername, setDevtoUsername] = useState("");
+  const [devtoImporting, setDevtoImporting] = useState(false);
+  const [devtoMessage, setDevtoMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [lemmyHandle, setLemmyHandle] = useState("");
+  const [lemmyImporting, setLemmyImporting] = useState(false);
+  const [lemmyMessage, setLemmyMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const exportInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -104,6 +113,9 @@ export default function ImportsPage() {
   const blueskyIcon = getPlatformIcon("Bluesky");
   const mastodonIcon = getPlatformIcon("Mastodon");
   const rssIcon = getPlatformIcon("RSS");
+  const hnIcon = getPlatformIcon("HackerNews");
+  const devtoIcon = getPlatformIcon("Devto");
+  const lemmyIcon = getPlatformIcon("Lemmy");
   const platformsWithContent = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0);
 
   useEffect(() => {
@@ -286,6 +298,58 @@ export default function ImportsPage() {
     } finally {
       setRssImporting(false);
     }
+  }
+
+  // Shared handler for the keyless username/handle imports (HN, Dev.to, Lemmy).
+  async function runKeylessImport(
+    endpoint: string,
+    payload: Record<string, string>,
+    setImporting: (value: boolean) => void,
+    setMessage: (value: { ok: boolean; text: string } | null) => void,
+    emptyNoun: string,
+  ) {
+    setImporting(true);
+    setMessage(null);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      const imported = data.imported ?? 0;
+      setMessage({
+        ok: true,
+        text:
+          imported === 0
+            ? `No ${emptyNoun} to import yet.`
+            : `Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"}. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleHnImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hnUsername.trim()) return;
+    void runKeylessImport("/api/import/hackernews", { username: hnUsername }, setHnImporting, setHnMessage, "posts");
+  }
+
+  function handleDevtoImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!devtoUsername.trim()) return;
+    void runKeylessImport("/api/import/devto", { username: devtoUsername }, setDevtoImporting, setDevtoMessage, "articles");
+  }
+
+  function handleLemmyImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!lemmyHandle.trim()) return;
+    void runKeylessImport("/api/import/lemmy", { handle: lemmyHandle }, setLemmyImporting, setLemmyMessage, "posts");
   }
 
   // Guaranteed path: the user uploads posts.csv / comments.csv from Reddit's
@@ -702,6 +766,204 @@ export default function ImportsPage() {
                 }}
               >
                 {rssMessage.text}
+              </div>
+            )}
+          </form>
+
+          <form
+            onSubmit={handleHnImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#F0652F",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {hnIcon && <PlatformIcon icon={hnIcon} color="#ffffff" size={17} title="Hacker News" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Hacker News</h2>
+            </div>
+            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+              Type your HN username — stories and comments, via the open API. No keys.
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <input
+                value={hnUsername}
+                onChange={(event) => setHnUsername(event.target.value)}
+                placeholder="pg"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...fieldStyle, flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={hnImporting || hnUsername.trim().length === 0}
+                style={{
+                  background: "#F0652F",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "white",
+                  cursor: hnImporting || hnUsername.trim().length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  opacity: hnImporting || hnUsername.trim().length === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1.4rem",
+                }}
+              >
+                {hnImporting ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            {hnMessage && (
+              <div style={{ color: hnMessage.ok ? "#16a34a" : "#F05522", marginTop: "0.75rem", fontSize: "0.9rem" }}>
+                {hnMessage.text}
+              </div>
+            )}
+          </form>
+
+          <form
+            onSubmit={handleDevtoImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#0A0A0A",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {devtoIcon && <PlatformIcon icon={devtoIcon} color="#ffffff" size={17} title="Dev.to" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Dev.to</h2>
+            </div>
+            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+              Type your Dev.to username — every article via the open API. No keys.
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <input
+                value={devtoUsername}
+                onChange={(event) => setDevtoUsername(event.target.value)}
+                placeholder="ben"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...fieldStyle, flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={devtoImporting || devtoUsername.trim().length === 0}
+                style={{
+                  background: "#0A0A0A",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "white",
+                  cursor: devtoImporting || devtoUsername.trim().length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  opacity: devtoImporting || devtoUsername.trim().length === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1.4rem",
+                }}
+              >
+                {devtoImporting ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            {devtoMessage && (
+              <div style={{ color: devtoMessage.ok ? "#16a34a" : "#F05522", marginTop: "0.75rem", fontSize: "0.9rem" }}>
+                {devtoMessage.text}
+              </div>
+            )}
+          </form>
+
+          <form
+            onSubmit={handleLemmyImport}
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#14854F",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {lemmyIcon && <PlatformIcon icon={lemmyIcon} color="#ffffff" size={17} title="Lemmy" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Lemmy</h2>
+            </div>
+            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+              Type your full handle — Lemmy&rsquo;s API is open and federated. No keys.
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <input
+                value={lemmyHandle}
+                onChange={(event) => setLemmyHandle(event.target.value)}
+                placeholder="@you@lemmy.world"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{ ...fieldStyle, flex: 1 }}
+              />
+              <button
+                type="submit"
+                disabled={lemmyImporting || lemmyHandle.trim().length === 0}
+                style={{
+                  background: "#14854F",
+                  border: "none",
+                  borderRadius: "9999px",
+                  color: "white",
+                  cursor: lemmyImporting || lemmyHandle.trim().length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  opacity: lemmyImporting || lemmyHandle.trim().length === 0 ? 0.5 : 1,
+                  padding: "0.7rem 1.4rem",
+                }}
+              >
+                {lemmyImporting ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+            {lemmyMessage && (
+              <div style={{ color: lemmyMessage.ok ? "#16a34a" : "#F05522", marginTop: "0.75rem", fontSize: "0.9rem" }}>
+                {lemmyMessage.text}
               </div>
             )}
           </form>

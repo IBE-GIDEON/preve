@@ -21,13 +21,26 @@ export interface PreveState {
 const LEGACY_STORAGE_KEY = "preve:mvp-state";
 const STORAGE_KEY = "preve:launch-state-v1";
 
-export const PLATFORM_ORDER: Platform[] = ["Reddit", "Bluesky", "Mastodon", "RSS", "X", "LinkedIn"];
+export const PLATFORM_ORDER: Platform[] = [
+  "Reddit",
+  "Bluesky",
+  "Mastodon",
+  "RSS",
+  "HackerNews",
+  "Devto",
+  "Lemmy",
+  "X",
+  "LinkedIn",
+];
 
 export const PLATFORM_TOTALS: Record<Platform, { posts: number; comments: number }> = {
   Reddit: { posts: 0, comments: 0 },
   Bluesky: { posts: 0, comments: 0 },
   Mastodon: { posts: 0, comments: 0 },
   RSS: { posts: 0, comments: 0 },
+  HackerNews: { posts: 0, comments: 0 },
+  Devto: { posts: 0, comments: 0 },
+  Lemmy: { posts: 0, comments: 0 },
   X: { posts: 0, comments: 0 },
   LinkedIn: { posts: 0, comments: 0 },
 };
@@ -61,6 +74,27 @@ export const DEFAULT_PREVE_STATE: PreveState = {
     },
     RSS: {
       platform: "RSS",
+      status: "disconnected",
+      posts: 0,
+      comments: 0,
+      lastSync: "Not connected",
+    },
+    HackerNews: {
+      platform: "HackerNews",
+      status: "disconnected",
+      posts: 0,
+      comments: 0,
+      lastSync: "Not connected",
+    },
+    Devto: {
+      platform: "Devto",
+      status: "disconnected",
+      posts: 0,
+      comments: 0,
+      lastSync: "Not connected",
+    },
+    Lemmy: {
+      platform: "Lemmy",
       status: "disconnected",
       posts: 0,
       comments: 0,
