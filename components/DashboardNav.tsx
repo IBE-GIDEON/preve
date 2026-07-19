@@ -5,6 +5,7 @@ import {
   DownloadCloud,
   FolderOpen,
   Link2,
+  PenLine,
   Search,
   Settings,
   type LucideIcon,
@@ -19,6 +20,7 @@ const NAV_ITEMS: Array<{
   exact?: boolean;
 }> = [
   { label: "Search", href: "/dashboard", icon: Search, exact: true },
+  { label: "Compose", href: "/dashboard/compose", icon: PenLine },
   { label: "Collections", href: "/dashboard/collections", icon: FolderOpen },
   { label: "Imports", href: "/dashboard/imports", icon: DownloadCloud },
   { label: "Accounts", href: "/dashboard/accounts", icon: Link2 },
@@ -28,9 +30,10 @@ const NAV_ITEMS: Array<{
 
 export default function DashboardNav({ variant = "sidebar" }: { variant?: "sidebar" | "tabbar" }) {
   const pathname = usePathname();
-  // The mobile tab bar keeps the 5 core destinations; Settings lives in the
-  // avatar menu up top (standard creator-app pattern).
-  const items = variant === "tabbar" ? NAV_ITEMS.filter((item) => item.label !== "Settings") : NAV_ITEMS;
+  // The mobile tab bar keeps the 5 core destinations (Settings lives in the
+  // avatar menu, Library on desktop) so it never crowds a phone width.
+  const items =
+    variant === "tabbar" ? NAV_ITEMS.filter((item) => item.label !== "Settings" && item.label !== "Library") : NAV_ITEMS;
 
   return (
     <nav className={variant === "tabbar" ? "tabbar-nav" : "sidebar-nav"}>

@@ -11,6 +11,7 @@ import {
   type PostKind,
 } from "../data/mockPosts";
 import { searchArchive } from "../../lib/search/client";
+import { SHARE_TARGETS } from "../../lib/publish";
 import { buildEmbeddings, semanticSearch } from "../../lib/semantic/client";
 import {
   addSavedSearch,
@@ -182,6 +183,13 @@ export default function DashboardPage() {
     await navigator.clipboard.writeText(value);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  // Copy the AI result and open the platform's composer pre-filled.
+  function openShare(url: string) {
+    if (!generatedRewrite) return;
+    navigator.clipboard.writeText(generatedRewrite).catch(() => {});
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   async function handleSavePost() {
@@ -873,6 +881,33 @@ export default function DashboardPage() {
                   </div>
                   <div style={{ whiteSpace: "pre-wrap", fontSize: "0.9rem", lineHeight: 1.5 }}>
                     {generatedRewrite}
+                  </div>
+                  <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center", marginTop: "0.85rem" }}>
+                    <span style={{ fontSize: "0.72rem", opacity: 0.5, fontWeight: 600 }}>Post to</span>
+                    {SHARE_TARGETS.filter((target) => target.prefills).map((target) => (
+                      <button
+                        key={target.id}
+                        onClick={() => openShare(target.url(generatedRewrite))}
+                        style={{
+                          background: target.color,
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "9999px",
+                          padding: "0.3rem 0.75rem",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {target.label}
+                      </button>
+                    ))}
+                    <Link
+                      href={`/dashboard/compose?text=${encodeURIComponent(generatedRewrite)}`}
+                      style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--foreground)", opacity: 0.6, textDecoration: "none" }}
+                    >
+                      Edit →
+                    </Link>
                   </div>
                 </div>
               )}

@@ -72,15 +72,28 @@ export async function POST(request: Request) {
     action?: string;
     text?: string;
     format?: string;
+    samples?: string[];
   };
   const action = body.action ?? "";
   const text = (body.text ?? "").slice(0, 6000).trim();
   if (!text) return NextResponse.json({ error: "Nothing to work with." }, { status: 400 });
 
+  const samples = Array.isArray(body.samples)
+    ? body.samples.filter((s): s is string => typeof s === "string" && s.trim().length > 0).slice(0, 5)
+    : [];
+
   let system: string;
+  let userMessage = text;
   if (action === "repurpose") {
     const format = body.format || "thread";
     system = `Repurpose the user's post into a ${format} for social media. Keep the author's voice, make it engaging and native to that format. Return only the ${format}.`;
+  } else if (action === "compose") {
+    system =
+      "You are the user's ghostwriter. Write a single social-media post from their brief, matching the voice, tone, vocabulary, and rhythm of the past posts they provide. Sound like them, not like an AI — no clichés, no hashtags unless they use them. Return only the post text.";
+    const voice = samples.length
+      ? `\n\nMy past posts (match this voice):\n---\n${samples.map((s) => s.slice(0, 500)).join("\n---\n")}`
+      : "";
+    userMessage = `Brief: ${text}${voice}`;
   } else if (PROMPTS[action]) {
     system = PROMPTS[action];
   } else {
@@ -88,7 +101,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await chatComplete(system, text);
+    const result = await chatComplete(system, userMessage);
     return NextResponse.json({ result, usage: usagePayload(usageInfo) });
   } catch (error) {
     return NextResponse.json(
