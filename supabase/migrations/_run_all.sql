@@ -1,4 +1,8 @@
 -- preve: run all migrations (001-004) in one paste. Idempotent — safe to re-run.
+--
+-- SUPERSEDED (2026-08-11): this only covers 001-004 and predates the B2B pivot,
+-- so it creates creator-era tables the app no longer reads and none of the
+-- company tables it now needs. Use ../setup.sql instead — one paste, current.
 
 -- ===== 001_profile.sql =====
 -- Phase 1: profile fields + avatar storage.
