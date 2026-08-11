@@ -1,9 +1,11 @@
 # Preve Tonight Setup
 
-Use this checklist to run the app with real accounts and private archive storage.
+Use this checklist to run the app with real accounts and real company data.
 
 1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the Supabase SQL editor.
+2. Run `supabase/setup.sql` in the Supabase SQL editor. It creates everything the
+   current app needs: `profiles`, `companies`, and `match_requests`. Files under
+   `supabase/migrations/` are the retired creator-era product — do not run them.
 3. Copy `.env.example` to `.env.local`.
 4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
    - If your Supabase project only shows an anon/public browser key, put it in `NEXT_PUBLIC_SUPABASE_ANON_KEY` or paste it into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
@@ -19,10 +21,10 @@ Use this checklist to run the app with real accounts and private archive storage
 Tonight-ready flow:
 
 - Sign up or sign in with Supabase Auth.
-- Open `/dashboard/imports`.
-- Paste posts, comments, threads, or articles separated by blank lines.
-- Search the imported archive from `/dashboard`.
-- Save posts and revisit them from `/dashboard/saved`.
+- Register your company at `/onboarding` — this is also what marks you onboarded.
+- Review and complete the company page at `/dashboard/company`.
+- Describe a business need at `/dashboard/match` and read the ranked providers
+  with the reasoning behind each score.
 
 Local preview:
 
@@ -33,8 +35,7 @@ Local preview:
 
 Still future work for enterprise:
 
-- OAuth import workers for Reddit, X, and LinkedIn.
-- Organization/team accounts.
+- Multiple seats per company (today one owner holds the page).
+- Verified provider directory instead of model-supplied providers.
 - Audit logs.
 - Billing and rate limits.
-- Embeddings-backed semantic search.

@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  Bookmark,
-  DownloadCloud,
-  FolderOpen,
-  Link2,
-  PenLine,
-  Search,
-  Settings,
-  type LucideIcon,
-} from "lucide-react";
+import { Briefcase, Building2, Settings, Target, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -19,21 +10,17 @@ const NAV_ITEMS: Array<{
   icon: LucideIcon;
   exact?: boolean;
 }> = [
-  { label: "Search", href: "/dashboard", icon: Search, exact: true },
-  { label: "Compose", href: "/dashboard/compose", icon: PenLine },
-  { label: "Collections", href: "/dashboard/collections", icon: FolderOpen },
-  { label: "Imports", href: "/dashboard/imports", icon: DownloadCloud },
-  { label: "Accounts", href: "/dashboard/accounts", icon: Link2 },
-  { label: "Library", href: "/dashboard/saved", icon: Bookmark },
+  { label: "Home", href: "/dashboard", icon: Building2, exact: true },
+  { label: "Match", href: "/dashboard/match", icon: Target },
+  { label: "Company", href: "/dashboard/company", icon: Briefcase },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export default function DashboardNav({ variant = "sidebar" }: { variant?: "sidebar" | "tabbar" }) {
   const pathname = usePathname();
-  // The mobile tab bar keeps the 5 core destinations (Settings lives in the
-  // avatar menu, Library on desktop) so it never crowds a phone width.
-  const items =
-    variant === "tabbar" ? NAV_ITEMS.filter((item) => item.label !== "Settings" && item.label !== "Library") : NAV_ITEMS;
+  // Settings is reachable from the avatar menu on phones, so the tab bar keeps
+  // only the three product destinations and never crowds a phone width.
+  const items = variant === "tabbar" ? NAV_ITEMS.filter((item) => item.label !== "Settings") : NAV_ITEMS;
 
   return (
     <nav className={variant === "tabbar" ? "tabbar-nav" : "sidebar-nav"}>

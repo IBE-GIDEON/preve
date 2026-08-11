@@ -9,10 +9,6 @@ function isProtectedPath(pathname: string) {
   return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function isOnboardingPath(pathname: string) {
-  return pathname === "/onboarding" || pathname.startsWith("/onboarding/");
-}
-
 /**
  * Build a redirect while carrying over any auth cookies that Supabase set on
  * `response` during `getUser()`. Skipping this drops the refreshed session and
@@ -71,7 +67,6 @@ export async function updateSession(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getUser();
   const user = data.user && !error ? data.user : null;
-  const isOnboarded = Boolean(user?.user_metadata?.onboarded);
 
   // Unauthenticated visitor on a protected route -> sign in.
   if (isProtectedPath(pathname) && !user) {
@@ -82,17 +77,17 @@ export async function updateSession(request: NextRequest) {
     return redirectWithSession(redirectUrl, response);
   }
 
-  // Signed-in user on the sign-in page -> forward to the right place.
+  // Signed-in user on the sign-in page -> into the app. Where they actually land
+  // is settled by the pages themselves: /dashboard sends anyone without a
+  // registered company to /onboarding, and /onboarding sends anyone with one
+  // back. Deliberately no onboarding rule here — middleware can only cheaply
+  // read `user_metadata.onboarded`, and whenever that flag disagreed with the
+  // `companies` table the two layers redirected at each other forever. Every
+  // pre-pivot account is in exactly that state (flag set, no company row), so
+  // the loop was not hypothetical.
   if (pathname === "/auth" && user) {
-    const target = isOnboarded
-      ? getSafeRedirectPath(request.nextUrl.searchParams.get("next"), "/dashboard")
-      : "/onboarding";
+    const target = getSafeRedirectPath(request.nextUrl.searchParams.get("next"), "/dashboard");
     return redirectWithSession(new URL(target, origin), response);
-  }
-
-  // Already-onboarded users should never see onboarding again.
-  if (isOnboardingPath(pathname) && user && isOnboarded) {
-    return redirectWithSession(new URL("/dashboard", origin), response);
   }
 
   return response;

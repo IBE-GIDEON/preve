@@ -166,7 +166,7 @@ export default function SettingsView({ account, canDeleteAccount }: SettingsView
             <div className="settings-row">
               <div>
                 <div className="settings-row-label">Export data</div>
-                <div className="settings-muted">Download everything in your archive as JSON.</div>
+                <div className="settings-muted">Download your profile, company page, and match history as JSON.</div>
               </div>
               <button className="settings-ghost-btn" onClick={handleExport} disabled={busy === "export"}>
                 {busy === "export" ? "Preparing..." : "Export"}
@@ -180,7 +180,7 @@ export default function SettingsView({ account, canDeleteAccount }: SettingsView
             <div className="settings-row" style={{ borderTop: "none", paddingTop: 0 }}>
               <div>
                 <div className="settings-row-label">Delete account</div>
-                <div className="settings-muted">Permanently remove your account and all imported data. This can't be undone.</div>
+                <div className="settings-muted">Permanently remove your account, your company page, and every match run. This can't be undone.</div>
               </div>
               {!confirmingDelete && (
                 <button className="settings-ghost-btn danger" onClick={() => setConfirmingDelete(true)}>
@@ -243,8 +243,8 @@ export default function SettingsView({ account, canDeleteAccount }: SettingsView
             Your data
           </h3>
           <div style={{ opacity: 0.65, fontSize: "0.9rem", lineHeight: 1.5 }}>
-            Auth and archive storage are handled by Supabase. Export gives you a full JSON snapshot
-            of your account, profile, and archived content.
+            Auth and storage are handled by Supabase. Export gives you a full JSON snapshot of your
+            account, your company page, and the reasoning behind every match you've run.
           </div>
         </div>
       </aside>

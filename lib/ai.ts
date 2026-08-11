@@ -39,7 +39,7 @@ export function hasAiEnv() {
   return providers().length > 0;
 }
 
-async function callProvider(provider: Provider, system: string, user: string): Promise<string> {
+async function callProvider(provider: Provider, system: string, user: string, maxTokens: number): Promise<string> {
   const res = await fetch(`${provider.base}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
@@ -50,7 +50,7 @@ async function callProvider(provider: Provider, system: string, user: string): P
         { role: "user", content: user },
       ],
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
     }),
   });
 
@@ -64,14 +64,15 @@ async function callProvider(provider: Provider, system: string, user: string): P
 }
 
 /** Run a chat completion, falling back to the next provider on any failure. */
-export async function chatComplete(system: string, user: string): Promise<string> {
+export async function chatComplete(system: string, user: string, opts?: { maxTokens?: number }): Promise<string> {
   const list = providers();
   if (list.length === 0) throw new Error("AI isn't configured.");
 
+  const maxTokens = opts?.maxTokens ?? 1024;
   let lastError: Error | null = null;
   for (const provider of list) {
     try {
-      return await callProvider(provider, system, user);
+      return await callProvider(provider, system, user, maxTokens);
     } catch (error) {
       // Groq rate-limited or down -> try Gemini next.
       lastError = error instanceof Error ? error : new Error("AI request failed");

@@ -16,19 +16,20 @@ export default async function ProfilePage() {
       userId = userData.user.id;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, username, bio, website, social_links, is_public, avatar_url")
+        .select("full_name, avatar_url")
         .eq("id", userData.user.id)
         .maybeSingle();
 
       initial = {
         email: userData.user.email ?? "",
-        fullName: profile?.full_name ?? "",
-        username: profile?.username ?? "",
-        bio: profile?.bio ?? "",
-        website: profile?.website ?? "",
-        socialLinks: (profile?.social_links as Record<string, string> | null) ?? {},
-        isPublic: Boolean(profile?.is_public),
-        avatarUrl: profile?.avatar_url ?? "",
+        fullName:
+          (profile?.full_name as string | null) ??
+          (userData.user.user_metadata?.full_name as string | undefined) ??
+          "",
+        avatarUrl:
+          (profile?.avatar_url as string | null) ??
+          (userData.user.user_metadata?.avatar_url as string | undefined) ??
+          "",
       };
     }
   }

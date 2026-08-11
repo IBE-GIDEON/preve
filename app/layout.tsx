@@ -4,9 +4,9 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "preve - Search Everything You've Ever Posted",
+  title: "preve - AI Matching for Everything Your Business Needs",
   description:
-    "Preve is an AI memory for creators: connect your platforms, index your posts and comments, and find your best words again.",
+    "Preve is AI procurement infrastructure: describe what your business needs, and get matched with the best-fit providers — with the reasoning explained.",
   applicationName: "preve",
   appleWebApp: { capable: true, title: "preve", statusBarStyle: "default" },
   icons: {
@@ -14,9 +14,9 @@ export const metadata: Metadata = {
     apple: "/images/preve-search-mark.png",
   },
   openGraph: {
-    title: "preve - Search Everything You've Ever Posted",
+    title: "preve - AI Matching for Everything Your Business Needs",
     description:
-      "Connect your social archive, search everything you have published, and repurpose your best content.",
+      "Tell Preve what your business needs — insurance, cloud, accounting, legal, recruiting — and it qualifies the need and matches you with the right providers.",
     type: "website",
   },
 };

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { chatComplete, hasAiEnv } from "../../../lib/ai";
+import { buildCompanyBrief, type CompanyProfile } from "../../../lib/company";
+import { getCompanyById, saveMatchRequest } from "../../../lib/companies/server";
+import { MATCH_SYSTEM, parseMatch } from "../../../lib/match";
 import { createClient } from "../../../lib/supabase/server";
 
 export const maxDuration = 60;
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
     text?: string;
     format?: string;
     samples?: string[];
+    companyId?: string;
   };
   const action = body.action ?? "";
   const text = (body.text ?? "").slice(0, 6000).trim();
@@ -84,6 +88,8 @@ export async function POST(request: Request) {
 
   let system: string;
   let userMessage = text;
+  // Held so a successful match can be filed against the company afterwards.
+  let matchCompany: CompanyProfile | null = null;
   if (action === "repurpose") {
     const format = body.format || "thread";
     system = `Repurpose the user's post into a ${format} for social media. Keep the author's voice, make it engaging and native to that format. Return only the ${format}.`;
@@ -94,6 +100,24 @@ export async function POST(request: Request) {
       ? `\n\nMy past posts (match this voice):\n---\n${samples.map((s) => s.slice(0, 500)).join("\n---\n")}`
       : "";
     userMessage = `Brief: ${text}${voice}`;
+  } else if (action === "match") {
+    system = MATCH_SYSTEM;
+    const companyId = (body.companyId ?? "").trim();
+    if (companyId) {
+      // The brief is built here, never accepted from the client — otherwise a
+      // caller could describe themselves as anyone. The read runs under the
+      // user's own session, so RLS returns nothing for someone else's company.
+      matchCompany = await getCompanyById(companyId);
+      if (!matchCompany) {
+        return NextResponse.json(
+          { error: "That company isn't available on this account.", usage: usagePayload(usageInfo) },
+          { status: 403 },
+        );
+      }
+      userMessage = buildCompanyBrief(matchCompany, text);
+    }
+    // Without a companyId the text is already the whole brief — the pre-profile
+    // callers keep working.
   } else if (PROMPTS[action]) {
     system = PROMPTS[action];
   } else {
@@ -101,6 +125,29 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (action === "match") {
+      // Matching needs more room than the other actions and returns JSON.
+      const raw = await chatComplete(system, userMessage, { maxTokens: 1600 });
+      const match = parseMatch(raw);
+      if (!match) {
+        return NextResponse.json(
+          { error: "The matching engine returned an unreadable answer — try again.", usage: usagePayload(usageInfo) },
+          { status: 502 },
+        );
+      }
+      if (matchCompany) {
+        // Best effort: the answer is already good, so a failed write must not
+        // turn it into an error the user sees.
+        await saveMatchRequest({
+          companyId: matchCompany.id,
+          need: text,
+          qualification: match.qualification,
+          providers: match.providers,
+        }).catch(() => {});
+      }
+      return NextResponse.json({ match, usage: usagePayload(usageInfo) });
+    }
+
     const result = await chatComplete(system, userMessage);
     return NextResponse.json({ result, usage: usagePayload(usageInfo) });
   } catch (error) {

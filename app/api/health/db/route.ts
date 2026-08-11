@@ -6,7 +6,9 @@ import { createClient } from "../../../../lib/supabase/server";
 export async function GET() {
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from("public_profiles").select("id").limit(1);
+    // Reads `profiles` rather than the old public_profiles view — that view only
+    // exists in the retired creator-era migration, so it 404s on a fresh project.
+    const { error } = await supabase.from("profiles").select("id").limit(1);
     return NextResponse.json({ ok: !error });
   } catch {
     return NextResponse.json({ ok: false });

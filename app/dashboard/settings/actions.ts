@@ -13,11 +13,12 @@ export async function exportUserData(): Promise<{ ok: boolean; data?: unknown; e
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return { ok: false, error: "You're not signed in." };
 
-  const [profile, items, saved, accounts] = await Promise.all([
+  // RLS scopes both company reads to this user, so no owner filter is needed —
+  // and match runs come back with the reasoning, which is the part worth keeping.
+  const [profile, companies, matches] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", userData.user.id).maybeSingle(),
-    supabase.from("archive_items").select("*").order("created_at", { ascending: false }),
-    supabase.from("saved_archive_items").select("archive_item_id"),
-    supabase.from("connected_accounts").select("platform, platform_username, status, last_sync_at"),
+    supabase.from("companies").select("*").order("created_at", { ascending: false }),
+    supabase.from("match_requests").select("*").order("created_at", { ascending: false }),
   ]);
 
   return {
@@ -27,9 +28,8 @@ export async function exportUserData(): Promise<{ ok: boolean; data?: unknown; e
       product: "preve",
       account: { id: userData.user.id, email: userData.user.email },
       profile: profile.data ?? null,
-      archiveItems: items.data ?? [],
-      savedItemIds: (saved.data ?? []).map((row) => row.archive_item_id),
-      connectedAccounts: accounts.data ?? [],
+      companies: companies.data ?? [],
+      matchRequests: matches.data ?? [],
     },
   };
 }
