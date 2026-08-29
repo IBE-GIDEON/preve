@@ -5,6 +5,7 @@ import { FolderOpen, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ConfirmDialog from "../../../components/ConfirmDialog";
+import { CollectionsGridSkeleton } from "../../../components/Skeletons";
 import {
   createCollection,
   deleteCollection,
@@ -101,7 +102,7 @@ export default function CollectionsPage() {
           {error && <p className="auth-field-error" style={{ marginBottom: "1rem" }}>{error}</p>}
 
           {loading ? (
-            <p className="settings-muted">Loading collections…</p>
+            <CollectionsGridSkeleton />
           ) : collections.length === 0 ? (
             <div className="settings-section" style={{ textAlign: "center", padding: "2.5rem 1.5rem" }}>
               <FolderOpen size={28} style={{ opacity: 0.4 }} />

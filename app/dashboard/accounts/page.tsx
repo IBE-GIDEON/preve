@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { PlatformIcon } from "../../../components/PlatformIcon";
 import { CONNECT_PLATFORMS } from "../../../lib/connect-platforms";
 import { isRedditEnabled } from "../../../lib/flags";
+import { ConnectGridSkeleton } from "../../../components/Skeletons";
 import {
   connectAccount,
   disconnectAccount,
@@ -136,7 +137,7 @@ export default function AccountsPage() {
           {error && <p className="auth-field-error" style={{ marginBottom: "1rem" }}>{error}</p>}
 
           {loading ? (
-            <p className="settings-muted">Loading accounts…</p>
+            <ConnectGridSkeleton />
           ) : (
             <div className="connect-grid">
               {CONNECT_PLATFORMS.map((platform) => {

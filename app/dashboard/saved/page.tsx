@@ -8,6 +8,7 @@ import type { Post } from "../../data/mockPosts";
 import { getPlatformColor } from "../../data/mockPosts";
 import { getArchiveStats, loadArchivePosts, toggleArchiveItemSaved } from "../../../lib/archive/client";
 import { listCollections, type Collection } from "../../../lib/collections/client";
+import { CollectionsGridSkeleton, SavedListSkeleton } from "../../../components/Skeletons";
 import {
   clearSearchHistory,
   getSearchHistory,
@@ -108,7 +109,9 @@ export default function LibraryPage() {
               <h2 className="settings-section-title" style={{ margin: 0 }}>Collections</h2>
               <Link href="/dashboard/collections" className="auth-inline-link">View all</Link>
             </div>
-            {collections.length === 0 ? (
+            {loading ? (
+              <CollectionsGridSkeleton count={4} />
+            ) : collections.length === 0 ? (
               <Link href="/dashboard/collections" className="settings-ghost-btn" style={{ display: "inline-flex" }}>
                 <Plus size={15} /> Create a collection
               </Link>
@@ -129,7 +132,7 @@ export default function LibraryPage() {
           <section className="settings-section">
             <h2 className="settings-section-title">Saved items</h2>
             {loading ? (
-              <p className="settings-muted">Loading…</p>
+              <SavedListSkeleton />
             ) : savedPosts.length === 0 ? (
               <p className="settings-muted">
                 Nothing saved yet. <Link href="/dashboard" className="auth-inline-link">Search your archive</Link> and save posts.
