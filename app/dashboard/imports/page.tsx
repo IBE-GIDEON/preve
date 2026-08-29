@@ -440,7 +440,6 @@ export default function ImportsPage() {
         >
           <h1 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: "2rem" }}>Imports</h1>
 
-          {isRedditEnabled() && (
           <form
             onSubmit={handleRedditImport}
             style={{
@@ -469,59 +468,67 @@ export default function ImportsPage() {
               </div>
               <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from Reddit</h2>
             </div>
-            <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
-              The reliable way: sign in with Reddit once and your history imports automatically.
-            </div>
+            {isRedditEnabled() ? (
+              <>
+                <div style={{ opacity: 0.55, fontSize: "0.9rem", marginBottom: "1rem" }}>
+                  The reliable way: sign in with Reddit once and your history imports automatically.
+                </div>
 
-            <button
-              type="button"
-              onClick={() => window.location.assign("/api/connect/reddit")}
-              style={{
-                background: "#FF4500",
-                border: "none",
-                borderRadius: "9999px",
-                color: "white",
-                cursor: "pointer",
-                fontWeight: 700,
-                padding: "0.8rem 1.5rem",
-                width: "100%",
-                fontSize: "0.95rem",
-              }}
-            >
-              Connect Reddit — one-click import
-            </button>
+                <button
+                  type="button"
+                  onClick={() => window.location.assign("/api/connect/reddit")}
+                  style={{
+                    background: "#FF4500",
+                    border: "none",
+                    borderRadius: "9999px",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    padding: "0.8rem 1.5rem",
+                    width: "100%",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  Connect Reddit — one-click import
+                </button>
 
-            <div style={{ opacity: 0.5, fontSize: "0.82rem", margin: "1rem 0 0.6rem" }}>
-              Or try by username (public posts only — Reddit sometimes blocks this):
-            </div>
+                <div style={{ opacity: 0.5, fontSize: "0.82rem", margin: "1rem 0 0.6rem" }}>
+                  Or try by username (public posts only — Reddit sometimes blocks this):
+                </div>
 
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              <input
-                value={redditUsername}
-                onChange={(event) => setRedditUsername(event.target.value)}
-                placeholder="u/yourname"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                style={{ ...fieldStyle, flex: 1 }}
-              />
-              <button
-                type="submit"
-                disabled={redditImporting || redditUsername.trim().length === 0}
-                style={{
-                  background: "#FF4500",
-                  border: "none",
-                  borderRadius: "9999px",
-                  color: "white",
-                  cursor: redditImporting || redditUsername.trim().length === 0 ? "not-allowed" : "pointer",
-                  fontWeight: 700,
-                  opacity: redditImporting || redditUsername.trim().length === 0 ? 0.5 : 1,
-                  padding: "0.7rem 1.4rem",
-                }}
-              >
-                {redditImporting ? "Importing..." : "Import"}
-              </button>
-            </div>
+                <div style={{ display: "flex", gap: "0.75rem" }}>
+                  <input
+                    value={redditUsername}
+                    onChange={(event) => setRedditUsername(event.target.value)}
+                    placeholder="u/yourname"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    style={{ ...fieldStyle, flex: 1 }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={redditImporting || redditUsername.trim().length === 0}
+                    style={{
+                      background: "#FF4500",
+                      border: "none",
+                      borderRadius: "9999px",
+                      color: "white",
+                      cursor: redditImporting || redditUsername.trim().length === 0 ? "not-allowed" : "pointer",
+                      fontWeight: 700,
+                      opacity: redditImporting || redditUsername.trim().length === 0 ? 0.5 : 1,
+                      padding: "0.7rem 1.4rem",
+                    }}
+                  >
+                    {redditImporting ? "Importing..." : "Import"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ opacity: 0.6, fontSize: "0.9rem", marginBottom: "0.25rem", lineHeight: 1.5 }}>
+                Reddit blocks anonymous imports, so bring your history in with your data export — it always works, no login needed. (One-click sign-in unlocks once Reddit API keys are added.)
+              </div>
+            )}
 
             {redditMessage && (
               <div
@@ -537,7 +544,7 @@ export default function ImportsPage() {
 
             <div style={{ borderTop: "1px solid rgba(0,0,0,0.08)", marginTop: "1.25rem", paddingTop: "1rem" }}>
               <div style={{ fontSize: "0.9rem", opacity: 0.75, marginBottom: "0.6rem", lineHeight: 1.5 }}>
-                <strong>Or upload your Reddit export</strong> (works even when Reddit blocks imports):
+                <strong>Upload your Reddit export</strong> — the always-works path, no login or keys needed:
                 request it at{" "}
                 <a
                   href="https://www.reddit.com/settings/data-request"
@@ -563,7 +570,6 @@ export default function ImportsPage() {
               )}
             </div>
           </form>
-          )}
 
           <form
             onSubmit={handleBlueskyImport}

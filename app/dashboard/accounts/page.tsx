@@ -146,9 +146,12 @@ export default function AccountsPage() {
                 const status = account ? STATUS_STYLES[account.status] : null;
                 const isBusy = busy === platform.id;
                 // Reddit is locked until API keys exist (see lib/flags).
-                const locked = platform.id === "reddit" && !isRedditEnabled();
-                const ready = platform.ready && !locked;
-                const oauthStart = locked ? undefined : platform.oauthStart;
+                // Reddit works via the export upload on the Imports page even
+                // without keys, so route "Connect" there until one-click OAuth
+                // is unlocked (keys present) — no dead "Soon" state.
+                const redditNoKeys = platform.id === "reddit" && !isRedditEnabled();
+                const ready = platform.ready;
+                const oauthStart = redditNoKeys ? "/dashboard/imports" : platform.oauthStart;
 
                 return (
                   <section key={platform.id} className="connect-card">
