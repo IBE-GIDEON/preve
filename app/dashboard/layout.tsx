@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import ThemeToggle from "../../components/ThemeToggle";
 import DashboardNav from "../../components/DashboardNav";
 import SidebarUser from "../../components/SidebarUser";
+import AutoSync from "../../components/AutoSync";
 import { hasSupabasePublicEnv, isLocalPreviewAuthBypassEnabled } from "../../lib/supabase/env";
 import { createClient } from "../../lib/supabase/server";
 
@@ -37,6 +38,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="dashboard-layout">
+      {/* Silently re-syncs connected accounts on app open (new posts appear). */}
+      <AutoSync />
+
       {/* Desktop: fixed left sidebar */}
       <aside className="dashboard-sidebar">
         <Link href="/dashboard" className="logo" style={{ textDecoration: "none" }}>
