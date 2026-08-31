@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Brain,
@@ -13,7 +13,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import ThemeToggle from "../components/ThemeToggle";
 import FloatingIcons from "../components/FloatingIcons";
@@ -144,9 +144,24 @@ const specifications = [
   }
 ];
 
+const HERO_HEADLINES = [
+  "Your next post is already written.",
+  "Never run out of things to post.",
+  "Your best content is already written.",
+];
+
 export default function LandingPage() {
   const [footerEmail, setFooterEmail] = useState("");
   const [footerSubscribed, setFooterSubscribed] = useState(false);
+  const [heroLine, setHeroLine] = useState(0);
+
+  // Rotate the hero headline with a glassy blur crossfade (~3.5s each).
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setHeroLine((i) => (i + 1) % HERO_HEADLINES.length);
+    }, 3500);
+    return () => window.clearInterval(id);
+  }, []);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,9 +195,22 @@ export default function LandingPage() {
             className="legacy-landing-hero"
             style={{ pointerEvents: 'auto' }}
           >
-            <h1 id="legacy-hero-title">Search Everything You&apos;ve Ever Posted</h1>
+            <h1 id="legacy-hero-title" className="hero-rotate">
+              <AnimatePresence initial={false}>
+                <motion.span
+                  key={heroLine}
+                  className="hero-rotate-line"
+                  initial={{ opacity: 0, filter: "blur(14px)" }}
+                  animate={{ opacity: 1, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, filter: "blur(14px)" }}
+                  transition={{ duration: 0.9, ease: "easeInOut" }}
+                >
+                  {HERO_HEADLINES[heroLine]}
+                </motion.span>
+              </AnimatePresence>
+            </h1>
             <p>
-              The gallery for your words. Find, reuse, and organize your content across all platforms instantly.
+              preve turns everything you&apos;ve ever posted into your next post — your best ideas, resurfaced and remixed with AI in your voice. Never start from a blank page again.
             </p>
 
             <Link href="/auth?next=/onboarding" className="legacy-landing-link">

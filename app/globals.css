@@ -4670,3 +4670,14 @@ textarea {
   white-space: nowrap;
   border: 0;
 }
+
+/* Rotating hero headline — glassy blur crossfade between outcome lines.
+   Grid-stacking all lines in one cell lets the exiting + entering line
+   overlap (true crossfade) while the cell auto-sizes to the tallest, so
+   there's no layout jump. */
+.hero-rotate {
+  display: grid;
+}
+.hero-rotate-line {
+  grid-area: 1 / 1;
+}
