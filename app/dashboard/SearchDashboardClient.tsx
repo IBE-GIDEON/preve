@@ -103,6 +103,13 @@ export default function DashboardPage() {
     [archivePosts],
   );
 
+  // Where you can repurpose *to*: X + LinkedIn always (top destinations you
+  // can't import from), plus every platform you've actually connected. Deduped.
+  const repurposeTargets = useMemo<Platform[]>(() => {
+    const merged: Platform[] = ["X", "LinkedIn", ...platformsWithContent];
+    return merged.filter((platform, i) => merged.indexOf(platform) === i);
+  }, [platformsWithContent]);
+
   // If the selected platform disappears from the archive, fall back to All.
   useEffect(() => {
     if (filterPlatform !== "all" && archivePosts.length > 0 && !platformsWithContent.includes(filterPlatform)) {
@@ -748,7 +755,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   onClick={() => setRepurposeOpen((v) => !v)}
-                  disabled={aiLoading || platformsWithContent.length === 0}
+                  disabled={aiLoading}
                   className="action-btn"
                   style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
@@ -757,7 +764,7 @@ export default function DashboardPage() {
                 </button>
                 {repurposeOpen && (
                   <div className="repurpose-menu">
-                    {platformsWithContent.map((platform) => (
+                    {repurposeTargets.map((platform) => (
                       <button
                         key={platform}
                         className="repurpose-menu-item"
