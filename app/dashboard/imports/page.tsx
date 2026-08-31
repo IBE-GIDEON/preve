@@ -13,6 +13,8 @@ import { isValidBlueskyHandle, normalizeBlueskyHandle } from "../../../lib/blues
 import { isRedditEnabled } from "../../../lib/flags";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
 import { parseRedditExportCsv } from "../../../lib/reddit-export";
+import { isLinkedInExportFile, parseLinkedInExportCsv } from "../../../lib/linkedin-export";
+import { readZipTextEntries } from "../../../lib/zip";
 import {
   isValidRedditUsername,
   normalizeRedditUsername,
@@ -86,6 +88,8 @@ export default function ImportsPage() {
   const [redditImporting, setRedditImporting] = useState(false);
   const [redditMessage, setRedditMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [exportImporting, setExportImporting] = useState(false);
+  const [linkedinImporting, setLinkedinImporting] = useState(false);
+  const [linkedinMessage, setLinkedinMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [blueskyHandle, setBlueskyHandle] = useState("");
   const [blueskyImporting, setBlueskyImporting] = useState(false);
   const [blueskyMessage, setBlueskyMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -105,6 +109,7 @@ export default function ImportsPage() {
   const [lemmyImporting, setLemmyImporting] = useState(false);
   const [lemmyMessage, setLemmyMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const exportInputRef = useRef<HTMLInputElement>(null);
+  const linkedinInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
@@ -117,6 +122,7 @@ export default function ImportsPage() {
   const hnIcon = getPlatformIcon("HackerNews");
   const devtoIcon = getPlatformIcon("Devto");
   const lemmyIcon = getPlatformIcon("Lemmy");
+  const linkedinIcon = getPlatformIcon("LinkedIn");
   const platformsWithContent = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0);
 
   useEffect(() => {
@@ -403,6 +409,59 @@ export default function ImportsPage() {
     }
   }
 
+  async function ingestLinkedInInChunks(items: NormalizedItem[]): Promise<number> {
+    let imported = 0;
+    for (let i = 0; i < items.length; i += 500) {
+      const res = await fetch("/api/import/linkedin/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: items.slice(i, i + 500) }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      imported += data.imported ?? 0;
+    }
+    return imported;
+  }
+
+  // Drop the whole .zip LinkedIn emails you (we find Shares.csv / Comments.csv
+  // inside), or the loose CSVs. No API, no login — nothing LinkedIn can block.
+  async function handleLinkedInExportUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setLinkedinImporting(true);
+    setLinkedinMessage(null);
+
+    try {
+      const items: NormalizedItem[] = [];
+      for (const file of Array.from(files)) {
+        const isZip = file.name.toLowerCase().endsWith(".zip") || file.type.includes("zip");
+        if (isZip) {
+          const entries = await readZipTextEntries(await file.arrayBuffer(), isLinkedInExportFile);
+          for (const text of Object.values(entries)) items.push(...parseLinkedInExportCsv(text));
+        } else {
+          items.push(...parseLinkedInExportCsv(await file.text()));
+        }
+      }
+      if (items.length === 0) {
+        throw new Error(
+          "No posts or comments found. Drop the .zip LinkedIn emailed you, or its Shares.csv / Comments.csv.",
+        );
+      }
+
+      const imported = await ingestLinkedInInChunks(items);
+      setLinkedinMessage({
+        ok: true,
+        text: `Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"} from LinkedIn. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setLinkedinMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setLinkedinImporting(false);
+      if (linkedinInputRef.current) linkedinInputRef.current.value = "";
+    }
+  }
+
   async function handleManualImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setImporting(true);
@@ -570,6 +629,95 @@ export default function ImportsPage() {
               )}
             </div>
           </form>
+
+          <div
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#0A66C2",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                {linkedinIcon && <PlatformIcon icon={linkedinIcon} color="#ffffff" size={17} title="LinkedIn" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from LinkedIn</h2>
+            </div>
+            <div style={{ opacity: 0.6, fontSize: "0.9rem", marginBottom: "1rem", lineHeight: 1.5 }}>
+              LinkedIn locks its API to approved partners — so bring your history in with your own data export. It
+              imports your <strong>posts and comments</strong> (the words you actually wrote). Always works, no login,
+              no keys.
+            </div>
+
+            <ol
+              style={{
+                fontSize: "0.9rem",
+                opacity: 0.8,
+                lineHeight: 1.6,
+                paddingLeft: "1.2rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <li>
+                Open{" "}
+                <a
+                  href="https://www.linkedin.com/mypreferences/d/download-my-data"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "#0A66C2", textDecoration: "underline" }}
+                >
+                  your LinkedIn data export
+                </a>
+                , tick <strong>“Download larger data archive”</strong> (that one includes your comments), then Request
+                archive.
+              </li>
+              <li>
+                LinkedIn emails you a <code>.zip</code> — usually in ~10 min, up to 24 h.
+              </li>
+              <li>
+                Drop the whole <code>.zip</code> below — preve finds <code>Shares.csv</code> &amp;{" "}
+                <code>Comments.csv</code> inside for you.
+              </li>
+            </ol>
+
+            <input
+              ref={linkedinInputRef}
+              type="file"
+              accept=".zip,.csv,application/zip,text/csv"
+              multiple
+              disabled={linkedinImporting}
+              onChange={(event) => void handleLinkedInExportUpload(event.target.files)}
+              style={{ fontSize: "0.85rem", opacity: linkedinImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+            />
+            {linkedinImporting && (
+              <div style={{ fontSize: "0.85rem", opacity: 0.6, marginTop: "0.5rem" }}>Reading your export…</div>
+            )}
+            {linkedinMessage && (
+              <div
+                style={{
+                  color: linkedinMessage.ok ? "#16a34a" : "#F05522",
+                  marginTop: "0.75rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {linkedinMessage.text}
+              </div>
+            )}
+          </div>
 
           <form
             onSubmit={handleBlueskyImport}

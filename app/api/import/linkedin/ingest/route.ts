@@ -1,0 +1,108 @@
+import { NextResponse } from "next/server";
+import { upsertArchiveItems } from "../../../../../lib/archive/server";
+import type { NormalizedItem } from "../../../../../lib/reddit-shared";
+import { createClient } from "../../../../../lib/supabase/server";
+
+export const maxDuration = 30;
+
+// LinkedIn exports are typically a few hundred–few thousand posts + comments.
+const MAX_ITEMS = 5000;
+
+// Browser-supplied data is untrusted — rebuild each item field by field.
+function sanitizeItem(raw: unknown): NormalizedItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+
+  const id = typeof r.platform_item_id === "string" ? r.platform_item_id.trim() : "";
+  if (!/^[a-z0-9_]{1,40}$/i.test(id)) return null;
+
+  const kind = r.kind === "comment" ? ("comment" as const) : r.kind === "post" ? ("post" as const) : null;
+  if (!kind) return null;
+
+  const body = typeof r.body === "string" ? r.body.slice(0, 40000) : "";
+  if (!body) return null;
+  const sourceTitle = typeof r.source_title === "string" ? r.source_title.slice(0, 500) : null;
+
+  let url: string | null = null;
+  if (typeof r.url === "string" && /^https?:\/\//i.test(r.url)) url = r.url.slice(0, 2000);
+
+  const topics = Array.isArray(r.topics)
+    ? r.topics.filter((t): t is string => typeof t === "string").slice(0, 20).map((t) => t.slice(0, 100))
+    : [];
+
+  const engagement = (r.engagement ?? {}) as Record<string, unknown>;
+  const likes = Number(engagement.likes) || 0;
+  const comments = Number(engagement.comments) || 0;
+
+  const parsedDate = new Date(typeof r.published_at === "string" ? r.published_at : NaN);
+  const publishedAt = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+
+  return {
+    platform_item_id: id,
+    kind,
+    source_title: sourceTitle,
+    body,
+    url,
+    topics,
+    engagement: { likes, comments },
+    published_at: publishedAt,
+  };
+}
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  const userId = userData.user.id;
+
+  const body = (await request.json().catch(() => ({}))) as { name?: string; items?: unknown[] };
+
+  if (!Array.isArray(body.items) || body.items.length > MAX_ITEMS) {
+    return NextResponse.json({ error: "Invalid import payload." }, { status: 400 });
+  }
+
+  const items = body.items.map(sanitizeItem).filter((item): item is NormalizedItem => item !== null);
+
+  const displayName =
+    typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 120) : "LinkedIn export";
+
+  const now = new Date().toISOString();
+  try {
+    const imported = await upsertArchiveItems(supabase, userId, "linkedin", items);
+
+    await supabase.from("connected_accounts").upsert(
+      {
+        user_id: userId,
+        platform: "linkedin",
+        platform_username: displayName,
+        status: "connected",
+        last_sync_at: now,
+        metadata: { import_source: "data_export" },
+      },
+      { onConflict: "user_id,platform" },
+    );
+
+    await supabase.from("import_jobs").insert({
+      user_id: userId,
+      platform: "linkedin",
+      status: "completed",
+      total_items: items.length,
+      imported_items: imported,
+      started_at: now,
+      completed_at: new Date().toISOString(),
+    });
+
+    return NextResponse.json({ imported, total: items.length });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Import failed.";
+    await supabase.from("import_jobs").insert({
+      user_id: userId,
+      platform: "linkedin",
+      status: "failed",
+      error_message: message,
+      started_at: now,
+      completed_at: new Date().toISOString(),
+    });
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
