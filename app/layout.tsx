@@ -57,6 +57,10 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
+  // Proves site ownership to Google Search Console (URL-prefix property).
+  verification: {
+    google: "_uK5xXWa0Lmry6aP5UlU__vPwDsGfKXJ7g6ktxDOxvw",
+  },
 };
 
 // Structured data: tells Google preve is a free web app (can earn a rich result).
