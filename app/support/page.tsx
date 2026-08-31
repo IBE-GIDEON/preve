@@ -39,9 +39,9 @@ export default function SupportPage() {
           <div className="support-heart" aria-hidden="true">♥</div>
           <h1 className="support-title">Support preve</h1>
           <p className="support-lede">
-            preve is free for creators, and stays free while we grow — search everything you&rsquo;ve ever
-            posted, on a $0 budget. Supporters cover the servers and the AI, and get the founder&rsquo;s
-            deal in return.
+            preve is free for creators, and stays free while we grow — turning everything you&rsquo;ve ever
+            posted into your next post, on a $0 budget. Supporters cover the servers and the AI, and get the
+            founder&rsquo;s deal in return.
           </p>
         </div>
 

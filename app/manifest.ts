@@ -6,7 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "preve — your creator memory",
     short_name: "preve",
-    description: "Search everything you've ever posted. Import your archive, find it instantly, repurpose it with AI.",
+    description:
+      "Your next post is already written. preve turns everything you've ever posted into your next post — resurfaced and remixed with AI, in your voice.",
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#ffffff",
