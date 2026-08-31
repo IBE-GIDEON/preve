@@ -38,6 +38,43 @@ function usagePayload(info: UsageInfo) {
   return { remaining: info.remaining, limit: info.limit, resetInSeconds: info.resetInSeconds };
 }
 
+export interface PostSuggestion {
+  source: number; // 1-based index into the sources the client sent
+  platform: string;
+  post: string;
+}
+
+// The model is asked for a JSON array; be forgiving about fences/stray prose.
+function parseSuggestions(raw: string, maxSource: number): PostSuggestion[] {
+  let text = raw.trim();
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) text = fence[1].trim();
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
+  if (start !== -1 && end !== -1 && end > start) text = text.slice(start, end + 1);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const out: PostSuggestion[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const post = typeof o.post === "string" ? o.post.trim() : "";
+    if (!post) continue;
+    let source = Math.floor(Number(o.source));
+    if (!Number.isFinite(source) || source < 1 || source > maxSource) source = 1;
+    const platform = typeof o.platform === "string" ? o.platform.slice(0, 40) : "";
+    out.push({ source, platform, post: post.slice(0, 4000) });
+  }
+  return out.slice(0, 6);
+}
+
 const PROMPTS: Record<string, string> = {
   summarize: "You are a concise editor. Summarize the user's post in 2 short sentences. Return only the summary.",
   rewrite:
@@ -73,8 +110,56 @@ export async function POST(request: Request) {
     text?: string;
     format?: string;
     samples?: string[];
+    sources?: Array<{ text?: string; platform?: string }>;
+    count?: number;
   };
   const action = body.action ?? "";
+
+  // "suggest" (preve Posts) — ground fresh post ideas in the user's archive and
+  // return a structured list, each tied to the past post it builds on.
+  if (action === "suggest") {
+    const rawSources = Array.isArray(body.sources) ? body.sources : [];
+    const sources = rawSources
+      .filter((s): s is { text?: string; platform?: string } => !!s && typeof s === "object" && typeof s.text === "string")
+      .slice(0, 12)
+      .map((s, i) => ({
+        n: i + 1,
+        text: String(s.text).replace(/\s+/g, " ").trim().slice(0, 800),
+        platform: typeof s.platform === "string" ? s.platform.slice(0, 40) : "",
+      }))
+      .filter((s) => s.text.length > 0);
+
+    if (sources.length === 0) {
+      return NextResponse.json(
+        { error: "Import some posts first — the AI needs your history to riff on.", usage: usagePayload(usageInfo) },
+        { status: 400 },
+      );
+    }
+
+    const count = Math.min(6, Math.max(1, Number(body.count) || 4));
+    const list = sources.map((s) => `[${s.n}]${s.platform ? ` (${s.platform})` : ""} ${s.text}`).join("\n\n");
+    const system =
+      "You are the user's ghostwriter. Study their past posts and propose brand-new posts they could publish next, in their voice — same tone, vocabulary, and rhythm. Sound like them, never like an AI: no clichés, no emoji spam, no hashtags unless they use them. Each idea must be inspired by exactly ONE of the numbered past posts. Return ONLY a JSON array (no prose, no code fences). Each element: {\"source\": <number of the past post it builds on>, \"platform\": \"<the single best platform for it>\", \"post\": \"<the ready-to-publish post text>\"}.";
+    const userMessage = `My past posts:\n${list}\n\nWrite ${count} new posts I could publish next. Vary the topics and angles across them. Return the JSON array only.`;
+
+    try {
+      const raw = await chatComplete(system, userMessage);
+      const suggestions = parseSuggestions(raw, sources.length);
+      if (suggestions.length === 0) {
+        return NextResponse.json(
+          { error: "The AI didn't return usable ideas — please try again.", usage: usagePayload(usageInfo) },
+          { status: 502 },
+        );
+      }
+      return NextResponse.json({ suggestions, usage: usagePayload(usageInfo) });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "AI request failed.", usage: usagePayload(usageInfo) },
+        { status: 500 },
+      );
+    }
+  }
+
   const text = (body.text ?? "").slice(0, 6000).trim();
   if (!text) return NextResponse.json({ error: "Nothing to work with." }, { status: 400 });
 

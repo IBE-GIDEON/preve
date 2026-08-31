@@ -8,6 +8,7 @@ import {
   PenLine,
   Search,
   Settings,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,6 +21,7 @@ const NAV_ITEMS: Array<{
   exact?: boolean;
 }> = [
   { label: "Search", href: "/dashboard", icon: Search, exact: true },
+  { label: "Posts", href: "/dashboard/posts", icon: Sparkles },
   { label: "Compose", href: "/dashboard/compose", icon: PenLine },
   { label: "Collections", href: "/dashboard/collections", icon: FolderOpen },
   { label: "Imports", href: "/dashboard/imports", icon: DownloadCloud },
@@ -30,10 +32,12 @@ const NAV_ITEMS: Array<{
 
 export default function DashboardNav({ variant = "sidebar" }: { variant?: "sidebar" | "tabbar" }) {
   const pathname = usePathname();
-  // The mobile tab bar keeps the 5 core destinations (Settings lives in the
-  // avatar menu, Library on desktop) so it never crowds a phone width.
-  const items =
-    variant === "tabbar" ? NAV_ITEMS.filter((item) => item.label !== "Settings" && item.label !== "Library") : NAV_ITEMS;
+  // The mobile tab bar keeps 5 core destinations so it never crowds a phone
+  // width. Posts (AI ideas) is the primary create surface on mobile, so Compose
+  // rides along inside it there; Settings lives in the avatar menu, Library on
+  // desktop.
+  const TABBAR_HIDDEN = new Set(["Settings", "Library", "Compose"]);
+  const items = variant === "tabbar" ? NAV_ITEMS.filter((item) => !TABBAR_HIDDEN.has(item.label)) : NAV_ITEMS;
 
   return (
     <nav className={variant === "tabbar" ? "tabbar-nav" : "sidebar-nav"}>
