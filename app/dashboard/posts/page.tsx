@@ -74,6 +74,22 @@ function getPlatformLabel(platform: Platform) {
   return platform === "X" ? "X" : platform;
 }
 
+// Map the AI's free-text platform ("X thread", "Hacker News"…) to a canonical
+// Platform so the filter matches reliably, even on older cached suggestions.
+function normalizePlatform(raw: string): Platform | null {
+  const s = (raw || "").toLowerCase();
+  if (s.includes("linkedin")) return "LinkedIn";
+  if (s.includes("bluesky") || s.includes("bsky")) return "Bluesky";
+  if (s.includes("mastodon")) return "Mastodon";
+  if (s.includes("reddit")) return "Reddit";
+  if (s.includes("hacker") || s === "hn") return "HackerNews";
+  if (s.includes("dev.to") || s.includes("devto") || s.includes("dev to")) return "Devto";
+  if (s.includes("lemmy")) return "Lemmy";
+  if (s.includes("rss") || s.includes("blog")) return "RSS";
+  if (s.includes("twitter") || /\bx\b/.test(s)) return "X";
+  return null;
+}
+
 export default function PrevePostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loadingArchive, setLoadingArchive] = useState(true);
@@ -86,7 +102,25 @@ export default function PrevePostsPage() {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
   const autoTried = useRef(false);
+
+  // Filter chips are fully dynamic: only the platforms actually present among
+  // the current ideas (ordered), so a chip never leads to an empty view.
+  const availableFilterPlatforms = useMemo<Platform[]>(() => {
+    const present = new Set<Platform>();
+    for (const s of suggestions) {
+      const p = normalizePlatform(s.platform);
+      if (p) present.add(p);
+    }
+    return PLATFORM_ORDER.filter((p) => present.has(p));
+  }, [suggestions]);
+
+  useEffect(() => {
+    if (filterPlatform !== "all" && !availableFilterPlatforms.includes(filterPlatform)) {
+      setFilterPlatform("all");
+    }
+  }, [filterPlatform, availableFilterPlatforms]);
 
   // Platforms you can repurpose *into*: X + LinkedIn always, plus what you've
   // actually imported (so the AI can retarget a draft to another network).
@@ -145,6 +179,7 @@ export default function PrevePostsPage() {
           action: "suggest",
           count,
           sources: srcs.map((s) => ({ text: s.text, platform: s.platform })),
+          platforms: repurposeTargets.map((p) => getPlatformLabel(p)),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -229,6 +264,10 @@ export default function PrevePostsPage() {
   }
 
   const hasIdeas = suggestions.length > 0;
+  const visibleCount =
+    filterPlatform === "all"
+      ? suggestions.length
+      : suggestions.filter((s) => normalizePlatform(s.platform) === filterPlatform).length;
 
   return (
     <div className="dashboard-content-area">
@@ -302,10 +341,35 @@ export default function PrevePostsPage() {
             </p>
           )}
 
+          {/* Dynamic platform filter — only platforms present in the current ideas */}
+          {hasIdeas && availableFilterPlatforms.length >= 2 && (
+            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "1.5rem" }}>
+              <button
+                className={`posts-chip${filterPlatform === "all" ? " active" : ""}`}
+                onClick={() => setFilterPlatform("all")}
+              >
+                All
+              </button>
+              {availableFilterPlatforms.map((platform) => (
+                <button
+                  key={platform}
+                  className={`posts-chip${filterPlatform === platform ? " active" : ""}`}
+                  onClick={() => setFilterPlatform(platform)}
+                  style={filterPlatform === platform ? { borderColor: getPlatformColor(platform), color: getPlatformColor(platform) } : undefined}
+                >
+                  {getPlatformLabel(platform)}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Idea cards */}
-          <div style={{ marginTop: "1.75rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <div style={{ marginTop: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
             <AnimatePresence initial={false}>
               {suggestions.map((suggestion, index) => {
+                if (filterPlatform !== "all" && normalizePlatform(suggestion.platform) !== filterPlatform) {
+                  return null;
+                }
                 const ref = sources[suggestion.source - 1];
                 const draft = drafts[index] ?? "";
                 const busy = cardBusy === index;
@@ -449,6 +513,19 @@ export default function PrevePostsPage() {
               })}
             </AnimatePresence>
           </div>
+
+          {hasIdeas && filterPlatform !== "all" && visibleCount === 0 && (
+            <p className="settings-muted" style={{ fontSize: "0.9rem", marginTop: "0.5rem" }}>
+              No {getPlatformLabel(filterPlatform)} ideas in this batch —{" "}
+              <button
+                onClick={() => setFilterPlatform("all")}
+                style={{ background: "none", border: "none", color: "#F05522", cursor: "pointer", padding: 0, font: "inherit" }}
+              >
+                clear the filter
+              </button>{" "}
+              or generate fresh ideas.
+            </p>
+          )}
 
           {hasIdeas && (
             <p className="settings-muted" style={{ fontSize: "0.8rem", marginTop: "1.5rem" }}>

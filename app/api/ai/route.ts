@@ -112,6 +112,7 @@ export async function POST(request: Request) {
     samples?: string[];
     sources?: Array<{ text?: string; platform?: string }>;
     count?: number;
+    platforms?: string[];
   };
   const action = body.action ?? "";
 
@@ -137,10 +138,17 @@ export async function POST(request: Request) {
     }
 
     const count = Math.min(6, Math.max(1, Number(body.count) || 4));
+    const allowedPlatforms = Array.isArray(body.platforms)
+      ? body.platforms.filter((p): p is string => typeof p === "string" && p.trim().length > 0).slice(0, 12)
+      : [];
     const list = sources.map((s) => `[${s.n}]${s.platform ? ` (${s.platform})` : ""} ${s.text}`).join("\n\n");
+    const platformRule = allowedPlatforms.length
+      ? ` The "platform" value MUST be exactly one of: ${allowedPlatforms.join(", ")}.`
+      : "";
     const system =
-      "You are the user's ghostwriter. Study their past posts and propose brand-new posts they could publish next, in their voice — same tone, vocabulary, and rhythm. Sound like them, never like an AI: no clichés, no emoji spam, no hashtags unless they use them. Each idea must be inspired by exactly ONE of the numbered past posts. Return ONLY a JSON array (no prose, no code fences). Each element: {\"source\": <number of the past post it builds on>, \"platform\": \"<the single best platform for it>\", \"post\": \"<the ready-to-publish post text>\"}.";
-    const userMessage = `My past posts:\n${list}\n\nWrite ${count} new posts I could publish next. Vary the topics and angles across them. Return the JSON array only.`;
+      "You are the user's ghostwriter. Study their past posts and propose brand-new posts they could publish next, in their voice — same tone, vocabulary, and rhythm. Sound like them, never like an AI: no clichés, no emoji spam, no hashtags unless they use them. Each idea must be inspired by exactly ONE of the numbered past posts. Return ONLY a JSON array (no prose, no code fences). Each element: {\"source\": <number of the past post it builds on>, \"platform\": \"<the single best platform for it>\", \"post\": \"<the ready-to-publish post text>\"}." +
+      platformRule;
+    const userMessage = `My past posts:\n${list}\n\nWrite ${count} new posts I could publish next. Vary the topics and angles across them.${allowedPlatforms.length ? ` Spread them across these platforms where it makes sense: ${allowedPlatforms.join(", ")}.` : ""} Return the JSON array only.`;
 
     try {
       const raw = await chatComplete(system, userMessage);

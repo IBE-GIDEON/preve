@@ -4736,3 +4736,29 @@ textarea {
   height: 16px;
   font-size: 0.6rem;
 }
+
+/* preve Posts — dynamic platform filter chips */
+.posts-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.15s ease;
+}
+.posts-chip:hover {
+  opacity: 1;
+}
+.posts-chip.active {
+  opacity: 1;
+  border-color: #f05522;
+  color: #f05522;
+  background: rgba(240, 85, 34, 0.08);
+}
