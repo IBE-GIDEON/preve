@@ -1,4 +1,5 @@
 import { Heart } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -11,6 +12,11 @@ import { hasSupabasePublicEnv, isLocalPreviewAuthBypassEnabled } from "../../lib
 import { createClient } from "../../lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+// The signed-in app lives behind auth — keep it out of search indexes.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   let user: User | null = null;
