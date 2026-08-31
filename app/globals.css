@@ -4681,3 +4681,31 @@ textarea {
 .hero-rotate-line {
   grid-area: 1 / 1;
 }
+
+/* Repurpose dropdown (AI actions) — lists only the user's connected platforms */
+.repurpose-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+}
+.repurpose-menu-item {
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.repurpose-menu-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+[data-theme='dark'] .repurpose-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}

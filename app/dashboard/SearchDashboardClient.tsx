@@ -48,6 +48,19 @@ function getPlatformLabel(platform: Platform) {
   return platform === "X" ? "X" : platform;
 }
 
+// The native format the AI repurposes a post into, per platform.
+const REPURPOSE_FORMAT: Record<Platform, string> = {
+  X: "X thread",
+  LinkedIn: "LinkedIn post",
+  Bluesky: "Bluesky post",
+  Mastodon: "Mastodon post",
+  Reddit: "Reddit post",
+  RSS: "blog post",
+  HackerNews: "Hacker News post",
+  Devto: "Dev.to article",
+  Lemmy: "Lemmy post",
+};
+
 export default function DashboardPage() {
   const [searchValue, setSearchValue] = useState("");
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
@@ -70,6 +83,7 @@ export default function DashboardPage() {
   const [collectionsList, setCollectionsList] = useState<Collection[]>([]);
   const [postCollectionIds, setPostCollectionIds] = useState<string[]>([]);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [collectionBusy, setCollectionBusy] = useState<string | null>(null);
   const [collectionError, setCollectionError] = useState("");
   const [newCollectionName, setNewCollectionName] = useState("");
@@ -109,6 +123,7 @@ export default function DashboardPage() {
   // Which collections already hold the selected post (drives the ✓ states).
   useEffect(() => {
     setCollectionsOpen(false);
+    setRepurposeOpen(false);
     setCollectionError("");
     if (!selectedPost) {
       setPostCollectionIds([]);
@@ -731,12 +746,32 @@ export default function DashboardPage() {
                 <button onClick={() => runAi("rewrite")} disabled={aiLoading} className="action-btn">
                   Rewrite
                 </button>
-                <button onClick={() => runAi("repurpose", "LinkedIn post")} disabled={aiLoading} className="action-btn">
-                  Repurpose → LinkedIn
+                <button
+                  onClick={() => setRepurposeOpen((v) => !v)}
+                  disabled={aiLoading || platformsWithContent.length === 0}
+                  className="action-btn"
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                >
+                  <span>{aiLoading ? "Working…" : "Repurpose"}</span>
+                  <span style={{ opacity: 0.5 }}>{repurposeOpen ? "▴" : "▾"}</span>
                 </button>
-                <button onClick={() => runAi("repurpose", "X thread")} disabled={aiLoading} className="action-btn">
-                  Repurpose → Thread
-                </button>
+                {repurposeOpen && (
+                  <div className="repurpose-menu">
+                    {platformsWithContent.map((platform) => (
+                      <button
+                        key={platform}
+                        className="repurpose-menu-item"
+                        disabled={aiLoading}
+                        onClick={() => {
+                          setRepurposeOpen(false);
+                          runAi("repurpose", REPURPOSE_FORMAT[platform]);
+                        }}
+                      >
+                        {getPlatformLabel(platform)}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <button
                   onClick={() => selectedPost.url && window.open(selectedPost.url, "_blank", "noopener,noreferrer")}
                   className="action-btn"
