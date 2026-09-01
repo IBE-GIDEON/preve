@@ -24,6 +24,17 @@ function providers(): Provider[] {
     });
   }
 
+  // Cerebras: very fast, generous free token budget. Model overridable.
+  const cerebrasKey = process.env.CEREBRAS_API_KEY?.trim();
+  if (cerebrasKey) {
+    list.push({
+      name: "cerebras",
+      key: cerebrasKey,
+      base: process.env.CEREBRAS_BASE_URL?.trim() || "https://api.cerebras.ai/v1",
+      model: process.env.CEREBRAS_MODEL?.trim() || "llama-3.3-70b",
+    });
+  }
+
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
   if (geminiKey) {
     list.push({
@@ -33,6 +44,39 @@ function providers(): Provider[] {
       // gemini-2.0-flash was shut down 2026-06-01; gemini-flash-latest auto-tracks
       // the current flash model so it won't hard-404 again. Override w/ GEMINI_MODEL.
       model: process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest",
+    });
+  }
+
+  // A second Gemini project key = another free daily pool at zero extra code.
+  const geminiKey2 = process.env.GEMINI_API_KEY_2?.trim();
+  if (geminiKey2) {
+    list.push({
+      name: "gemini2",
+      key: geminiKey2,
+      base: "https://generativelanguage.googleapis.com/v1beta/openai",
+      model: process.env.GEMINI_MODEL_2?.trim() || process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest",
+    });
+  }
+
+  const mistralKey = process.env.MISTRAL_API_KEY?.trim();
+  if (mistralKey) {
+    list.push({
+      name: "mistral",
+      key: mistralKey,
+      base: process.env.MISTRAL_BASE_URL?.trim() || "https://api.mistral.ai/v1",
+      model: process.env.MISTRAL_MODEL?.trim() || "mistral-small-latest",
+    });
+  }
+
+  // OpenRouter: one key, many ":free" models. Set OPENROUTER_MODEL to a current
+  // free model id (the specific free models rotate over time).
+  const openrouterKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (openrouterKey) {
+    list.push({
+      name: "openrouter",
+      key: openrouterKey,
+      base: process.env.OPENROUTER_BASE_URL?.trim() || "https://openrouter.ai/api/v1",
+      model: process.env.OPENROUTER_MODEL?.trim() || "meta-llama/llama-3.3-70b-instruct:free",
     });
   }
 
@@ -82,17 +126,24 @@ async function callProvider(
   return data.choices?.[0]?.message?.content?.trim() ?? "";
 }
 
-/** Run a chat completion, falling back to the next provider on any failure. */
+// Rotates the starting provider each call so load spreads across every free
+// tier's per-minute/day limits instead of always hammering the first one.
+let rotation = 0;
+
+/** Run a chat completion, rotating start + falling back on any failure. */
 export async function chatComplete(system: string, user: string, options?: CompleteOptions): Promise<string> {
   const list = providers();
   if (list.length === 0) throw new Error("AI isn't configured.");
 
+  const start = list.length > 1 ? rotation++ % list.length : 0;
+  const ordered = start === 0 ? list : [...list.slice(start), ...list.slice(0, start)];
+
   let lastError: Error | null = null;
-  for (const provider of list) {
+  for (const provider of ordered) {
     try {
       return await callProvider(provider, system, user, options);
     } catch (error) {
-      // Groq rate-limited or down -> try Gemini next.
+      // This provider is down or rate-limited -> try the next one.
       lastError = error instanceof Error ? error : new Error("AI request failed");
     }
   }
