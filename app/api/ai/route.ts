@@ -4,11 +4,11 @@ import { createClient } from "../../../lib/supabase/server";
 
 export const maxDuration = 60;
 
-// Best-effort per-user rate limit (per warm serverless instance). Keeps a
-// single user from burning the free AI quota; a durable limiter is backlogged.
-const usage = new Map<string, number[]>();
-const WINDOW_MS = 10 * 60_000;
-const MAX_PER_WINDOW = 30;
+// Per-user DAILY AI caps, by feature bucket. Free tier for now; Premium
+// (coming soon) lifts these.
+const WINDOW_MS = 24 * 60 * 60_000; // 1 day
+const GENERAL_PER_DAY = 30; // repurpose, rewrite, compose, summarize, expand…
+const SUGGEST_PER_DAY = 5; // preve Posts idea generations
 
 interface UsageInfo {
   limited: boolean;
@@ -17,21 +17,24 @@ interface UsageInfo {
   resetInSeconds: number;
 }
 
-// Records this attempt and reports how much of the window is left, so the UI
-// can show the user their remaining AI actions.
-function recordUsage(userId: string): UsageInfo {
+// In-memory fallback limiter, used only until the durable Postgres limiter
+// (record_ai_usage) is available. Keyed per user AND feature bucket.
+const usage = new Map<string, number[]>();
+
+function recordUsage(userId: string, feature: string, limit: number): UsageInfo {
+  const key = `${userId}:${feature}`;
   const now = Date.now();
-  const stamps = (usage.get(userId) ?? []).filter((t) => now - t < WINDOW_MS);
+  const stamps = (usage.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
   const resetIn = (list: number[]) =>
     list.length ? Math.max(1, Math.ceil((WINDOW_MS - (now - list[0])) / 1000)) : Math.ceil(WINDOW_MS / 1000);
 
-  if (stamps.length >= MAX_PER_WINDOW) {
-    usage.set(userId, stamps);
-    return { limited: true, remaining: 0, limit: MAX_PER_WINDOW, resetInSeconds: resetIn(stamps) };
+  if (stamps.length >= limit) {
+    usage.set(key, stamps);
+    return { limited: true, remaining: 0, limit, resetInSeconds: resetIn(stamps) };
   }
   stamps.push(now);
-  usage.set(userId, stamps);
-  return { limited: false, remaining: MAX_PER_WINDOW - stamps.length, limit: MAX_PER_WINDOW, resetInSeconds: resetIn(stamps) };
+  usage.set(key, stamps);
+  return { limited: false, remaining: limit - stamps.length, limit, resetInSeconds: resetIn(stamps) };
 }
 
 function usagePayload(info: UsageInfo) {
@@ -39,30 +42,27 @@ function usagePayload(info: UsageInfo) {
 }
 
 // Durable limiter backed by Postgres (record_ai_usage RPC) so the cap is shared
-// across every serverless instance and survives cold starts — the in-memory
-// Map above can't do either. Falls back to that Map if the migration isn't
+// across every serverless instance and survives cold starts, which the in-memory
+// Map above cannot. Returns null (→ in-memory fallback) if the migration isn't
 // applied yet, so AI keeps working either way.
-let durableLimiterAvailable = true;
-
-async function recordAiUsage(supabase: Awaited<ReturnType<typeof createClient>>): Promise<UsageInfo | null> {
-  if (!durableLimiterAvailable) return null;
+async function recordAiUsage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  feature: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<UsageInfo | null> {
   const { data, error } = await supabase.rpc("record_ai_usage", {
-    max_per_window: MAX_PER_WINDOW,
-    window_seconds: Math.floor(WINDOW_MS / 1000),
+    max_per_window: limit,
+    window_seconds: windowSeconds,
+    feature_key: feature,
   });
-  if (error || !data) {
-    // Function missing (migration not applied) → stop retrying on this instance.
-    if (error?.code === "PGRST202" || /record_ai_usage|function/i.test(error?.message ?? "")) {
-      durableLimiterAvailable = false;
-    }
-    return null;
-  }
+  if (error || !data) return null;
   const row = data as { allowed?: boolean; remaining?: number; limit?: number; reset_in?: number };
   return {
     limited: row.allowed === false,
     remaining: typeof row.remaining === "number" ? Math.max(0, row.remaining) : 0,
-    limit: typeof row.limit === "number" ? row.limit : MAX_PER_WINDOW,
-    resetInSeconds: typeof row.reset_in === "number" ? row.reset_in : Math.floor(WINDOW_MS / 1000),
+    limit: typeof row.limit === "number" ? row.limit : limit,
+    resetInSeconds: typeof row.reset_in === "number" ? row.reset_in : windowSeconds,
   };
 }
 
@@ -174,18 +174,6 @@ export async function POST(request: Request) {
   const { data } = await supabase.auth.getUser();
   if (!data.user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
-  const usageInfo = (await recordAiUsage(supabase)) ?? recordUsage(data.user.id);
-  if (usageInfo.limited) {
-    const mins = Math.max(1, Math.round(usageInfo.resetInSeconds / 60));
-    return NextResponse.json(
-      {
-        error: `You've used all ${usageInfo.limit} AI actions for now — resets in about ${mins} min.`,
-        usage: usagePayload(usageInfo),
-      },
-      { status: 429 },
-    );
-  }
-
   const body = (await request.json().catch(() => ({}))) as {
     action?: string;
     text?: string;
@@ -196,6 +184,27 @@ export async function POST(request: Request) {
     platforms?: string[];
   };
   const action = body.action ?? "";
+
+  // Free-tier daily caps, per feature bucket. preve Posts idea generations get
+  // their own tighter cap; everything else shares the general bucket.
+  const isSuggest = action === "suggest";
+  const feature = isSuggest ? "suggest" : "general";
+  const limit = isSuggest ? SUGGEST_PER_DAY : GENERAL_PER_DAY;
+  const daySeconds = Math.floor(WINDOW_MS / 1000);
+
+  const usageInfo =
+    (await recordAiUsage(supabase, feature, limit, daySeconds)) ?? recordUsage(data.user.id, feature, limit);
+  if (usageInfo.limited) {
+    const what = isSuggest ? "post idea generations" : "AI actions";
+    return NextResponse.json(
+      {
+        error: `You've used all ${usageInfo.limit} free ${what} for today. Premium is coming soon to unlock more.`,
+        upgrade: true,
+        usage: usagePayload(usageInfo),
+      },
+      { status: 429 },
+    );
+  }
 
   // "suggest" (preve Posts) — ground fresh post ideas in the user's archive and
   // return a structured list, each tied to the past post it builds on.

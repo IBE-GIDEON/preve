@@ -103,6 +103,7 @@ export default function PrevePostsPage() {
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
+  const [upgrade, setUpgrade] = useState(false);
   const autoTried = useRef(false);
 
   // Filter chips are fully dynamic: only the platforms actually present among
@@ -167,6 +168,7 @@ export default function PrevePostsPage() {
     }
     setGenerating(true);
     setMessage(null);
+    setUpgrade(false);
 
     const srcs = pickSources(pool);
     setSources(srcs);
@@ -186,8 +188,13 @@ export default function PrevePostsPage() {
         suggestions?: StoredSuggestion[];
         error?: string;
         usage?: UsageInfo;
+        upgrade?: boolean;
       };
       if (data.usage) setUsage(data.usage);
+      if (res.status === 429 || data.upgrade) {
+        setUpgrade(true);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Couldn't generate ideas.");
 
       const next = data.suggestions ?? [];
@@ -215,8 +222,17 @@ export default function PrevePostsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, text, format }),
       });
-      const data = (await res.json().catch(() => ({}))) as { result?: string; error?: string; usage?: UsageInfo };
+      const data = (await res.json().catch(() => ({}))) as {
+        result?: string;
+        error?: string;
+        usage?: UsageInfo;
+        upgrade?: boolean;
+      };
       if (data.usage) setUsage(data.usage);
+      if (res.status === 429 || data.upgrade) {
+        setUpgrade(true);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "AI request failed.");
       const next = [...drafts];
       next[index] = data.result || next[index];
@@ -339,6 +355,34 @@ export default function PrevePostsPage() {
             <p className={message.ok ? "settings-status ok" : "auth-field-error"} style={{ marginTop: "1rem" }}>
               {message.text}
             </p>
+          )}
+
+          {upgrade && (
+            <div
+              style={{
+                marginTop: "1.25rem",
+                border: "1px solid #F05522",
+                background: "rgba(240,85,34,0.06)",
+                borderRadius: "14px",
+                padding: "1.25rem",
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: "1.05rem", marginBottom: "0.4rem" }}>
+                You&rsquo;ve hit today&rsquo;s free limit
+              </div>
+              <p className="settings-muted" style={{ marginBottom: "1rem", fontSize: "0.9rem", lineHeight: 1.5 }}>
+                Free preve includes {usage?.limit ?? 5} idea generations a day. Premium lifts the cap and unlocks a lot
+                more, and it&rsquo;s coming soon.
+              </p>
+              <button
+                className="settings-save-btn"
+                disabled
+                style={{ opacity: 0.7, cursor: "not-allowed", height: "42px", padding: "0 1.2rem" }}
+                title="Premium is coming soon"
+              >
+                Upgrade to Premium (coming soon)
+              </button>
+            </div>
           )}
 
           {/* Dynamic platform filter — only platforms present in the current ideas */}
