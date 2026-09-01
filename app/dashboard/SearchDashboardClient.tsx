@@ -308,7 +308,6 @@ export default function DashboardPage() {
   const [serverTotal, setServerTotal] = useState(0);
   const [serverLoading, setServerLoading] = useState(false);
   const [semanticFellBack, setSemanticFellBack] = useState(false);
-  const [semanticError, setSemanticError] = useState("");
 
   // Build the semantic index once when the user first switches to semantic mode.
   useEffect(() => {
@@ -346,31 +345,29 @@ export default function DashboardPage() {
       return out;
     };
 
-    const run = async (): Promise<{ posts: Post[]; total: number; fellBack: boolean; reason: string }> => {
+    const run = async (): Promise<{ posts: Post[]; total: number; fellBack: boolean }> => {
       if (searchMode === "semantic") {
         try {
           const posts = filterSemantic(await semanticSearch(debouncedQuery));
-          return { posts, total: posts.length, fellBack: false, reason: "" };
+          return { posts, total: posts.length, fellBack: false };
         } catch (err) {
-          // Semantic index unavailable → fall back to keyword so the user still
-          // gets results instead of a blank, broken-looking screen.
-          const reason = err instanceof Error ? err.message : "unknown error";
-          console.error("[preve] semantic search failed:", reason);
+          // Semantic unavailable → fall back to keyword so the user still gets
+          // results instead of a blank screen; log the real reason for debugging.
+          console.error("[preve] semantic search failed:", err instanceof Error ? err.message : err);
           const res = await keyword();
-          return { posts: res.posts, total: res.total, fellBack: true, reason };
+          return { posts: res.posts, total: res.total, fellBack: true };
         }
       }
       const res = await keyword();
-      return { posts: res.posts, total: res.total, fellBack: false, reason: "" };
+      return { posts: res.posts, total: res.total, fellBack: false };
     };
 
     run()
-      .then(({ posts, total, fellBack, reason }) => {
+      .then(({ posts, total, fellBack }) => {
         if (!active) return;
         setServerResults(posts);
         setServerTotal(total);
         setSemanticFellBack(fellBack);
-        setSemanticError(reason);
       })
       .catch(() => {
         if (!active) return;
@@ -541,9 +538,7 @@ export default function DashboardPage() {
               <span className="search-mode-hint">Building semantic index…</span>
             )}
             {searchMode === "semantic" && semanticFellBack && !indexing && (
-              <span className="search-mode-hint">
-                Semantic unavailable{semanticError ? ` (${semanticError})` : ""} — showing keyword matches.
-              </span>
+              <span className="search-mode-hint">Showing keyword matches while the semantic index catches up.</span>
             )}
           </div>
         </div>
