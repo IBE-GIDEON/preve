@@ -18,7 +18,9 @@ function providers(): Provider[] {
       name: "groq",
       key: groqKey,
       base: process.env.AI_BASE_URL?.trim() || "https://api.groq.com/openai/v1",
-      model: process.env.AI_MODEL?.trim() || "llama-3.3-70b-versatile",
+      // llama-3.3-70b-versatile was deprecated 2026-06-17; gpt-oss-120b is
+      // Groq's recommended free replacement. Override with AI_MODEL if needed.
+      model: process.env.AI_MODEL?.trim() || "openai/gpt-oss-120b",
     });
   }
 
@@ -28,7 +30,9 @@ function providers(): Provider[] {
       name: "gemini",
       key: geminiKey,
       base: "https://generativelanguage.googleapis.com/v1beta/openai",
-      model: process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash",
+      // gemini-2.0-flash was shut down 2026-06-01; gemini-flash-latest auto-tracks
+      // the current flash model so it won't hard-404 again. Override w/ GEMINI_MODEL.
+      model: process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest",
     });
   }
 
