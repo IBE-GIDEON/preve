@@ -83,6 +83,21 @@ const PROMPTS: Record<string, string> = {
     "Expand the user's post into a richer, well-structured piece while keeping the core idea and voice. Return only the expanded text.",
 };
 
+// Appended to every generation prompt so output reads like a person wrote it,
+// not like AI. These govern the writing itself (voice, punctuation, word choice).
+const HUMAN_STYLE = `Write so it reads like a real person wrote it, never like AI. Follow these strictly:
+- No emojis, icons, or decorative symbols.
+- No markdown, asterisks, bold, or headings.
+- No em dashes, and never use a hyphen as a dash; only use a hyphen inside a compound word such as well-known or long-term.
+- No ellipses, no double exclamation marks, no ALL-CAPS for emphasis.
+- Mix short and medium sentences and vary how they open; avoid repetitive structure.
+- Cut filler and hedging: no "in conclusion", "overall", "it's worth noting", "as mentioned", "let's dive in", "here's the thing", "at the end of the day".
+- Avoid AI-tell words: delve, tapestry, testament, landscape, realm, leverage, elevate, unlock, seamless, robust, game-changer, foster, underscore, and figurative "navigate".
+- No "it's not just X, it's Y" constructions, and no forced lists of three.
+- Keep the wording natural, not too fancy and not too plain; contractions are fine.
+- Be direct. Do not over-explain, moralize, or tack on a wrap-up line.
+- Do not restate the request or explain what you are doing.`;
+
 export async function POST(request: Request) {
   if (!hasAiEnv()) {
     return NextResponse.json({ error: "AI isn't configured yet. Add an AI_API_KEY." }, { status: 400 });
@@ -146,8 +161,9 @@ export async function POST(request: Request) {
       ? ` The "platform" value MUST be exactly one of: ${allowedPlatforms.join(", ")}.`
       : "";
     const system =
-      "You are the user's ghostwriter. Study their past posts and propose brand-new posts they could publish next, in their voice — same tone, vocabulary, and rhythm. Sound like them, never like an AI: no clichés, no emoji spam, no hashtags unless they use them. Each idea must be inspired by exactly ONE of the numbered past posts. Return ONLY a JSON array (no prose, no code fences). Each element: {\"source\": <number of the past post it builds on>, \"platform\": \"<the single best platform for it>\", \"post\": \"<the ready-to-publish post text>\"}." +
-      platformRule;
+      "You are the user's ghostwriter. Study their past posts and propose brand-new posts they could publish next, in their voice: same tone, vocabulary, and rhythm. Each idea must be inspired by exactly ONE of the numbered past posts. Return ONLY a JSON array (no prose, no code fences). Each element: {\"source\": <number of the past post it builds on>, \"platform\": \"<the single best platform for it>\", \"post\": \"<the ready-to-publish post text>\"}." +
+      platformRule +
+      `\n\n${HUMAN_STYLE}\nApply those writing rules to each "post" value. Still return only the JSON array, nothing else.`;
     const userMessage = `My past posts:\n${list}\n\nWrite ${count} new posts I could publish next. Vary the topics and angles across them.${allowedPlatforms.length ? ` Spread them across these platforms where it makes sense: ${allowedPlatforms.join(", ")}.` : ""} Return the JSON array only.`;
 
     try {
@@ -192,6 +208,8 @@ export async function POST(request: Request) {
   } else {
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }
+
+  system = `${system}\n\n${HUMAN_STYLE}`;
 
   try {
     const result = await chatComplete(system, userMessage);
