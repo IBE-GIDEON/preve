@@ -64,6 +64,7 @@ const REPURPOSE_FORMAT: Record<Platform, string> = {
 export default function DashboardPage() {
   const [searchValue, setSearchValue] = useState("");
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
   const [filterKind, setFilterKind] = useState<PostKind | "all">("all");
   const [filterDays, setFilterDays] = useState<"all" | "7" | "30" | "90" | "365">("all");
   const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
@@ -405,6 +406,10 @@ export default function DashboardPage() {
   });
 
   function renderPostCard(post: Post) {
+    const isExpanded = expandedPosts.has(post.id);
+    // Roughly two lines at card width; only offer the toggle when there's more.
+    const isLong = post.content.length > 140;
+
     return (
       <motion.div
         key={post.id}
@@ -440,14 +445,44 @@ export default function DashboardPage() {
           style={{
             fontWeight: 500,
             lineHeight: 1.5,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
+            whiteSpace: "pre-wrap",
+            ...(isExpanded
+              ? {}
+              : {
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }),
           }}
         >
           {post.content}
         </div>
+        {isLong && (
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpandedPosts((prev) => {
+                const next = new Set(prev);
+                if (next.has(post.id)) next.delete(post.id);
+                else next.add(post.id);
+                return next;
+              });
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              marginTop: "0.5rem",
+              color: "#F05522",
+              fontWeight: 600,
+              fontSize: "0.85rem",
+              cursor: "pointer",
+            }}
+          >
+            {isExpanded ? "Show less" : "Show more"}
+          </button>
+        )}
       </motion.div>
     );
   }

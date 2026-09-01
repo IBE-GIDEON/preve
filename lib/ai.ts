@@ -31,7 +31,7 @@ function providers(): Provider[] {
       name: "cerebras",
       key: cerebrasKey,
       base: process.env.CEREBRAS_BASE_URL?.trim() || "https://api.cerebras.ai/v1",
-      model: process.env.CEREBRAS_MODEL?.trim() || "llama-3.3-70b",
+      model: process.env.CEREBRAS_MODEL?.trim() || "gpt-oss-120b",
     });
   }
 
@@ -68,15 +68,15 @@ function providers(): Provider[] {
     });
   }
 
-  // OpenRouter: one key, many ":free" models. Set OPENROUTER_MODEL to a current
-  // free model id (the specific free models rotate over time).
+  // OpenRouter: the specific ":free" models rotate/delist often, so default to
+  // the "openrouter/free" router, which auto-picks a currently-free model.
   const openrouterKey = process.env.OPENROUTER_API_KEY?.trim();
   if (openrouterKey) {
     list.push({
       name: "openrouter",
       key: openrouterKey,
       base: process.env.OPENROUTER_BASE_URL?.trim() || "https://openrouter.ai/api/v1",
-      model: process.env.OPENROUTER_MODEL?.trim() || "meta-llama/llama-3.3-70b-instruct:free",
+      model: process.env.OPENROUTER_MODEL?.trim() || "openrouter/free",
     });
   }
 
