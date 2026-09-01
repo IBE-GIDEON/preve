@@ -43,19 +43,34 @@ export function hasAiEnv() {
   return providers().length > 0;
 }
 
-async function callProvider(provider: Provider, system: string, user: string): Promise<string> {
+export interface CompleteOptions {
+  /** Force the model to return a single JSON object (response_format). */
+  jsonMode?: boolean;
+  /** Override the default 1024 output-token cap (e.g. multi-item JSON). */
+  maxTokens?: number;
+}
+
+async function callProvider(
+  provider: Provider,
+  system: string,
+  user: string,
+  options?: CompleteOptions,
+): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: provider.model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature: 0.7,
+    max_tokens: options?.maxTokens ?? 1024,
+  };
+  if (options?.jsonMode) body.response_format = { type: "json_object" };
+
   const res = await fetch(`${provider.base}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: provider.model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      temperature: 0.7,
-      max_tokens: 1024,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -68,14 +83,14 @@ async function callProvider(provider: Provider, system: string, user: string): P
 }
 
 /** Run a chat completion, falling back to the next provider on any failure. */
-export async function chatComplete(system: string, user: string): Promise<string> {
+export async function chatComplete(system: string, user: string, options?: CompleteOptions): Promise<string> {
   const list = providers();
   if (list.length === 0) throw new Error("AI isn't configured.");
 
   let lastError: Error | null = null;
   for (const provider of list) {
     try {
-      return await callProvider(provider, system, user);
+      return await callProvider(provider, system, user, options);
     } catch (error) {
       // Groq rate-limited or down -> try Gemini next.
       lastError = error instanceof Error ? error : new Error("AI request failed");

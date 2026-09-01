@@ -44,28 +44,66 @@ export interface PostSuggestion {
   post: string;
 }
 
-// The model is asked for a JSON array; be forgiving about fences/stray prose.
-function parseSuggestions(raw: string, maxSource: number): PostSuggestion[] {
-  let text = raw.trim();
+// Reasoning models (e.g. gpt-oss) can wrap output in <think> blocks — strip them.
+function stripReasoning(text: string): string {
+  return text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
+    .trim();
+}
+
+// Pull a JSON value out of a model response even if it's fenced, prefixed with
+// reasoning/prose, or the model returned an object instead of a bare array.
+function extractJson(raw: string): unknown {
+  let text = stripReasoning(raw);
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence) text = fence[1].trim();
-  const start = text.indexOf("[");
-  const end = text.lastIndexOf("]");
-  if (start !== -1 && end !== -1 && end > start) text = text.slice(start, end + 1);
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    return JSON.parse(text);
   } catch {
-    return [];
+    /* fall through to substring extraction */
   }
-  if (!Array.isArray(parsed)) return [];
+  const o1 = text.indexOf("{");
+  const o2 = text.lastIndexOf("}");
+  if (o1 !== -1 && o2 > o1) {
+    try {
+      return JSON.parse(text.slice(o1, o2 + 1));
+    } catch {
+      /* try array next */
+    }
+  }
+  const a1 = text.indexOf("[");
+  const a2 = text.lastIndexOf("]");
+  if (a1 !== -1 && a2 > a1) {
+    try {
+      return JSON.parse(text.slice(a1, a2 + 1));
+    } catch {
+      /* give up */
+    }
+  }
+  return null;
+}
+
+function parseSuggestions(raw: string, maxSource: number): PostSuggestion[] {
+  const parsed = extractJson(raw);
+
+  let arr: unknown[] = [];
+  if (Array.isArray(parsed)) {
+    arr = parsed;
+  } else if (parsed && typeof parsed === "object") {
+    const o = parsed as Record<string, unknown>;
+    const candidate = o.ideas ?? o.posts ?? o.suggestions ?? o.results;
+    if (Array.isArray(candidate)) arr = candidate;
+  }
+  if (arr.length === 0) return [];
 
   const out: PostSuggestion[] = [];
-  for (const item of parsed) {
+  for (const item of arr) {
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
-    const post = typeof o.post === "string" ? o.post.trim() : "";
+    const post =
+      typeof o.post === "string" ? o.post.trim() : typeof o.text === "string" ? o.text.trim() : "";
     if (!post) continue;
     let source = Math.floor(Number(o.source));
     if (!Number.isFinite(source) || source < 1 || source > maxSource) source = 1;
@@ -161,13 +199,13 @@ export async function POST(request: Request) {
       ? ` The "platform" value MUST be exactly one of: ${allowedPlatforms.join(", ")}.`
       : "";
     const system =
-      "You are the user's ghostwriter. Study their past posts and propose brand-new posts they could publish next, in their voice: same tone, vocabulary, and rhythm. Each idea must be inspired by exactly ONE of the numbered past posts. Return ONLY a JSON array (no prose, no code fences). Each element: {\"source\": <number of the past post it builds on>, \"platform\": \"<the single best platform for it>\", \"post\": \"<the ready-to-publish post text>\"}." +
+      "You are the user's ghostwriter. Study their past posts and propose brand-new posts they could publish next, in their voice: same tone, vocabulary, and rhythm. Each idea must be inspired by exactly ONE of the numbered past posts. Respond with a single JSON object of the form {\"ideas\": [{\"source\": <number of the past post it builds on>, \"platform\": \"<the single best platform for it>\", \"post\": \"<the ready-to-publish post text>\"}]}. No prose, no code fences, no commentary." +
       platformRule +
-      `\n\n${HUMAN_STYLE}\nApply those writing rules to each "post" value. Still return only the JSON array, nothing else.`;
-    const userMessage = `My past posts:\n${list}\n\nWrite ${count} new posts I could publish next. Vary the topics and angles across them.${allowedPlatforms.length ? ` Spread them across these platforms where it makes sense: ${allowedPlatforms.join(", ")}.` : ""} Return the JSON array only.`;
+      `\n\n${HUMAN_STYLE}\nApply those writing rules to each "post" value. Return only the JSON object.`;
+    const userMessage = `My past posts:\n${list}\n\nWrite ${count} new posts I could publish next. Vary the topics and angles across them.${allowedPlatforms.length ? ` Spread them across these platforms where it makes sense: ${allowedPlatforms.join(", ")}.` : ""} Return the JSON object only.`;
 
     try {
-      const raw = await chatComplete(system, userMessage);
+      const raw = await chatComplete(system, userMessage, { jsonMode: true, maxTokens: 2048 });
       const suggestions = parseSuggestions(raw, sources.length);
       if (suggestions.length === 0) {
         return NextResponse.json(
@@ -212,7 +250,7 @@ export async function POST(request: Request) {
   system = `${system}\n\n${HUMAN_STYLE}`;
 
   try {
-    const result = await chatComplete(system, userMessage);
+    const result = stripReasoning(await chatComplete(system, userMessage));
     return NextResponse.json({ result, usage: usagePayload(usageInfo) });
   } catch (error) {
     return NextResponse.json(
