@@ -149,3 +149,38 @@ export async function chatComplete(system: string, user: string, options?: Compl
   }
   throw lastError ?? new Error("AI request failed");
 }
+
+/** Names of the providers currently configured (by which key envs are set). */
+export function providerNames(): string[] {
+  return providers().map((p) => p.name);
+}
+
+export interface ProviderHealth {
+  name: string;
+  model: string;
+  ok: boolean;
+  ms: number;
+  error?: string;
+}
+
+/** Ping every configured provider with a tiny call to see which actually work. */
+export async function healthCheck(): Promise<ProviderHealth[]> {
+  const list = providers();
+  return Promise.all(
+    list.map(async (p): Promise<ProviderHealth> => {
+      const start = Date.now();
+      try {
+        await callProvider(p, "You are a health check.", "Reply with the single word: ok", { maxTokens: 5 });
+        return { name: p.name, model: p.model, ok: true, ms: Date.now() - start };
+      } catch (error) {
+        return {
+          name: p.name,
+          model: p.model,
+          ok: false,
+          ms: Date.now() - start,
+          error: error instanceof Error ? error.message.slice(0, 200) : "failed",
+        };
+      }
+    }),
+  );
+}
