@@ -7,6 +7,7 @@ import { getPlatformColor } from "../../data/mockPosts";
 import { PLATFORM_ORDER } from "../../lib/preveState";
 import { PlatformIcon } from "../../../components/PlatformIcon";
 import { getArchiveStats, importManualArchive, loadArchivePostsCached } from "../../../lib/archive/client";
+import { buildEmbeddings } from "../../../lib/semantic/client";
 import { getConnectPlatform } from "../../../lib/connect-platforms";
 import { clearImportJobs, getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 import { isValidBlueskyHandle, normalizeBlueskyHandle } from "../../../lib/bluesky-shared";
@@ -138,6 +139,9 @@ export default function ImportsPage() {
         setLoading(false);
       });
       getRecentImportJobs().then(setImportJobs).catch(() => {});
+      // Warm the semantic index in the background so Semantic search is ready
+      // (no-op once everything is embedded; failures are non-fatal).
+      void buildEmbeddings().catch(() => {});
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : "Could not load your archive.");
     } finally {

@@ -62,8 +62,8 @@ create table if not exists public.archive_items (
 create table if not exists public.archive_embeddings (
   archive_item_id uuid primary key references public.archive_items(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  embedding vector(1536),
-  model text not null default 'text-embedding-3-small',
+  embedding vector(384),
+  model text not null default 'gte-small',
   created_at timestamptz not null default now()
 );
 
@@ -177,6 +177,24 @@ create index if not exists archive_items_user_platform_idx on public.archive_ite
 create index if not exists archive_items_user_published_idx on public.archive_items (user_id, published_at desc);
 create index if not exists archive_items_topics_idx on public.archive_items using gin (topics);
 create index if not exists saved_archive_items_user_created_idx on public.saved_archive_items (user_id, created_at desc);
-create index if not exists archive_embeddings_vector_idx
-  on public.archive_embeddings using ivfflat (embedding vector_cosine_ops)
-  with (lists = 100);
+create index if not exists archive_embeddings_hnsw_idx
+  on public.archive_embeddings using hnsw (embedding vector_cosine_ops);
+
+-- Returns the caller's archive items ordered by cosine similarity to a query
+-- embedding. security invoker => RLS on archive_items still applies.
+create or replace function public.match_archive_items(query_embedding vector(384), match_count int default 30)
+returns setof public.archive_items
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select ai.*
+  from public.archive_items ai
+  join public.archive_embeddings ae on ae.archive_item_id = ai.id
+  where ae.user_id = (select auth.uid())
+  order by ae.embedding <=> query_embedding
+  limit match_count;
+$$;
+
+grant execute on function public.match_archive_items(vector, int) to authenticated;

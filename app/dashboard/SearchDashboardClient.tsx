@@ -307,6 +307,7 @@ export default function DashboardPage() {
   const [serverResults, setServerResults] = useState<Post[]>([]);
   const [serverTotal, setServerTotal] = useState(0);
   const [serverLoading, setServerLoading] = useState(false);
+  const [semanticFellBack, setSemanticFellBack] = useState(false);
 
   // Build the semantic index once when the user first switches to semantic mode.
   useEffect(() => {
@@ -323,41 +324,55 @@ export default function DashboardPage() {
     if (!debouncedQuery) {
       setServerResults([]);
       setServerTotal(0);
+      setSemanticFellBack(false);
       return;
     }
     let active = true;
     setServerLoading(true);
 
-    const request =
-      searchMode === "semantic"
-        ? semanticSearch(debouncedQuery).then((posts) => ({ posts, total: posts.length }))
-        : searchArchive({
-            query: debouncedQuery,
-            platform: filterPlatform,
-            kind: filterKind,
-            days: filterDays === "all" ? "all" : Number(filterDays),
-          });
+    const days = filterDays === "all" ? "all" : Number(filterDays);
+    const keyword = () => searchArchive({ query: debouncedQuery, platform: filterPlatform, kind: filterKind, days });
 
-    request
-      .then((res) => {
-        if (!active) return;
-        let posts = res.posts;
-        // Semantic results aren't pre-filtered, so apply filters client-side.
-        if (searchMode === "semantic") {
-          if (filterPlatform !== "all") posts = posts.filter((post) => post.platform === filterPlatform);
-          if (filterKind !== "all") posts = posts.filter((post) => post.kind === filterKind);
-          if (filterDays !== "all") {
-            const cutoff = Date.now() - Number(filterDays) * 86_400_000;
-            posts = posts.filter((post) => post.publishedAt && new Date(post.publishedAt).getTime() >= cutoff);
-          }
+    // Semantic results aren't pre-filtered, so apply the active filters client-side.
+    const filterSemantic = (posts: Post[]) => {
+      let out = posts;
+      if (filterPlatform !== "all") out = out.filter((post) => post.platform === filterPlatform);
+      if (filterKind !== "all") out = out.filter((post) => post.kind === filterKind);
+      if (filterDays !== "all") {
+        const cutoff = Date.now() - Number(filterDays) * 86_400_000;
+        out = out.filter((post) => post.publishedAt && new Date(post.publishedAt).getTime() >= cutoff);
+      }
+      return out;
+    };
+
+    const run = async (): Promise<{ posts: Post[]; total: number; fellBack: boolean }> => {
+      if (searchMode === "semantic") {
+        try {
+          const posts = filterSemantic(await semanticSearch(debouncedQuery));
+          return { posts, total: posts.length, fellBack: false };
+        } catch {
+          // Semantic index unavailable → fall back to keyword so the user still
+          // gets results instead of a blank, broken-looking screen.
+          const res = await keyword();
+          return { posts: res.posts, total: res.total, fellBack: true };
         }
+      }
+      const res = await keyword();
+      return { posts: res.posts, total: res.total, fellBack: false };
+    };
+
+    run()
+      .then(({ posts, total, fellBack }) => {
+        if (!active) return;
         setServerResults(posts);
-        setServerTotal(searchMode === "semantic" ? posts.length : res.total);
+        setServerTotal(total);
+        setSemanticFellBack(fellBack);
       })
       .catch(() => {
         if (!active) return;
         setServerResults([]);
         setServerTotal(0);
+        setSemanticFellBack(false);
       })
       .finally(() => {
         if (active) setServerLoading(false);
@@ -520,6 +535,9 @@ export default function DashboardPage() {
             ))}
             {searchMode === "semantic" && indexing && (
               <span className="search-mode-hint">Building semantic index…</span>
+            )}
+            {searchMode === "semantic" && semanticFellBack && !indexing && (
+              <span className="search-mode-hint">Semantic index unavailable — showing keyword matches.</span>
             )}
           </div>
         </div>
