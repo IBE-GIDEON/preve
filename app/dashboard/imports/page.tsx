@@ -15,6 +15,7 @@ import { isRedditEnabled } from "../../../lib/flags";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
 import { parseRedditExportCsv } from "../../../lib/reddit-export";
 import { isLinkedInExportFile, parseLinkedInExportCsv } from "../../../lib/linkedin-export";
+import { isTwitterExportFile, parseTwitterExportJs } from "../../../lib/twitter-export";
 import { readZipTextEntries } from "../../../lib/zip";
 import {
   isValidRedditUsername,
@@ -91,6 +92,8 @@ export default function ImportsPage() {
   const [exportImporting, setExportImporting] = useState(false);
   const [linkedinImporting, setLinkedinImporting] = useState(false);
   const [linkedinMessage, setLinkedinMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [twitterImporting, setTwitterImporting] = useState(false);
+  const [twitterMessage, setTwitterMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [blueskyHandle, setBlueskyHandle] = useState("");
   const [blueskyImporting, setBlueskyImporting] = useState(false);
   const [blueskyMessage, setBlueskyMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -111,6 +114,7 @@ export default function ImportsPage() {
   const [lemmyMessage, setLemmyMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const exportInputRef = useRef<HTMLInputElement>(null);
   const linkedinInputRef = useRef<HTMLInputElement>(null);
+  const twitterInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
@@ -124,6 +128,7 @@ export default function ImportsPage() {
   const devtoIcon = getPlatformIcon("Devto");
   const lemmyIcon = getPlatformIcon("Lemmy");
   const linkedinIcon = getPlatformIcon("LinkedIn");
+  const twitterIcon = getPlatformIcon("X");
   const platformsWithContent = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0);
 
   useEffect(() => {
@@ -466,6 +471,57 @@ export default function ImportsPage() {
     }
   }
 
+  async function ingestTwitterInChunks(items: NormalizedItem[]): Promise<number> {
+    let imported = 0;
+    for (let i = 0; i < items.length; i += 500) {
+      const res = await fetch("/api/import/twitter/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: items.slice(i, i + 500) }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { imported?: number; error?: string };
+      if (!res.ok) throw new Error(data.error || "Import failed.");
+      imported += data.imported ?? 0;
+    }
+    return imported;
+  }
+
+  // Drop the whole .zip X emails you (we find tweets.js inside), or that file.
+  // X's live API is paid-only, so the archive is the keyless path.
+  async function handleTwitterExportUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setTwitterImporting(true);
+    setTwitterMessage(null);
+
+    try {
+      const items: NormalizedItem[] = [];
+      for (const file of Array.from(files)) {
+        const isZip = file.name.toLowerCase().endsWith(".zip") || file.type.includes("zip");
+        if (isZip) {
+          const entries = await readZipTextEntries(await file.arrayBuffer(), isTwitterExportFile);
+          for (const text of Object.values(entries)) items.push(...parseTwitterExportJs(text));
+        } else {
+          items.push(...parseTwitterExportJs(await file.text()));
+        }
+      }
+      if (items.length === 0) {
+        throw new Error("No tweets found. Drop the .zip X emailed you, or its tweets.js file.");
+      }
+
+      const imported = await ingestTwitterInChunks(items);
+      setTwitterMessage({
+        ok: true,
+        text: `Imported ${formatNumber(imported)} ${imported === 1 ? "item" : "items"} from X. Head to Search and try it.`,
+      });
+      await refreshArchive();
+    } catch (error) {
+      setTwitterMessage({ ok: false, text: error instanceof Error ? error.message : "Import failed." });
+    } finally {
+      setTwitterImporting(false);
+      if (twitterInputRef.current) twitterInputRef.current.value = "";
+    }
+  }
+
   async function handleManualImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setImporting(true);
@@ -719,6 +775,94 @@ export default function ImportsPage() {
                 }}
               >
                 {linkedinMessage.text}
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              background: "var(--background)",
+              border: "1px solid rgba(0,0,0,0.1)",
+              borderRadius: "16px",
+              marginBottom: "1rem",
+              padding: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <div
+                style={{
+                  background: "#000000",
+                  color: "white",
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                {twitterIcon && <PlatformIcon icon={twitterIcon} color="#ffffff" size={16} title="X" />}
+              </div>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: 700 }}>Import from X</h2>
+            </div>
+            <div style={{ opacity: 0.6, fontSize: "0.9rem", marginBottom: "1rem", lineHeight: 1.5 }}>
+              X&rsquo;s live API is paid-only, so a handle lookup isn&rsquo;t possible. Bring your history in with your
+              own data archive instead &mdash; it imports every tweet and reply you&rsquo;ve written. Always works, no
+              keys.
+            </div>
+
+            <ol
+              style={{
+                fontSize: "0.9rem",
+                opacity: 0.8,
+                lineHeight: 1.6,
+                paddingLeft: "1.2rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <li>
+                Open{" "}
+                <a
+                  href="https://x.com/settings/download_your_data"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "#1d9bf0", textDecoration: "underline" }}
+                >
+                  your X data download
+                </a>
+                , confirm your password, then Request archive.
+              </li>
+              <li>
+                X emails you a <code>.zip</code> when it&rsquo;s ready (can take up to 24&nbsp;h).
+              </li>
+              <li>
+                Drop the whole <code>.zip</code> below &mdash; preve finds <code>tweets.js</code> inside and skips
+                retweets.
+              </li>
+            </ol>
+
+            <input
+              ref={twitterInputRef}
+              type="file"
+              accept=".zip,.js,application/zip"
+              multiple
+              disabled={twitterImporting}
+              onChange={(event) => void handleTwitterExportUpload(event.target.files)}
+              style={{ fontSize: "0.85rem", opacity: twitterImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+            />
+            {twitterImporting && (
+              <div style={{ fontSize: "0.85rem", opacity: 0.6, marginTop: "0.5rem" }}>Reading your archive…</div>
+            )}
+            {twitterMessage && (
+              <div
+                style={{
+                  color: twitterMessage.ok ? "#16a34a" : "#F05522",
+                  marginTop: "0.75rem",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {twitterMessage.text}
               </div>
             )}
           </div>

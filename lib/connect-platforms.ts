@@ -50,8 +50,8 @@ const LINKEDIN: BrandIcon = {
 /** Every platform a user can connect. Reddit is live; the rest await OAuth. */
 export const CONNECT_PLATFORMS: ConnectPlatform[] = [
   { id: "reddit", label: "Reddit", icon: fromSi(siReddit), handlePrefix: "u/", ready: true, oauthStart: "/api/connect/reddit" },
-  { id: "x", label: "X", icon: fromSi(siX), handlePrefix: "@", ready: false },
-  { id: "linkedin", label: "LinkedIn", icon: LINKEDIN, handlePrefix: "", ready: false },
+  { id: "x", label: "X", icon: fromSi(siX), handlePrefix: "@", ready: true, oauthStart: "/dashboard/imports" },
+  { id: "linkedin", label: "LinkedIn", icon: LINKEDIN, handlePrefix: "", ready: true, oauthStart: "/dashboard/imports" },
   { id: "youtube", label: "YouTube", icon: fromSi(siYoutube), handlePrefix: "@", ready: false },
   { id: "instagram", label: "Instagram", icon: fromSi(siInstagram), handlePrefix: "@", ready: false },
   { id: "threads", label: "Threads", icon: fromSi(siThreads), handlePrefix: "@", ready: false },
