@@ -38,6 +38,34 @@ function usagePayload(info: UsageInfo) {
   return { remaining: info.remaining, limit: info.limit, resetInSeconds: info.resetInSeconds };
 }
 
+// Durable limiter backed by Postgres (record_ai_usage RPC) so the cap is shared
+// across every serverless instance and survives cold starts — the in-memory
+// Map above can't do either. Falls back to that Map if the migration isn't
+// applied yet, so AI keeps working either way.
+let durableLimiterAvailable = true;
+
+async function recordAiUsage(supabase: Awaited<ReturnType<typeof createClient>>): Promise<UsageInfo | null> {
+  if (!durableLimiterAvailable) return null;
+  const { data, error } = await supabase.rpc("record_ai_usage", {
+    max_per_window: MAX_PER_WINDOW,
+    window_seconds: Math.floor(WINDOW_MS / 1000),
+  });
+  if (error || !data) {
+    // Function missing (migration not applied) → stop retrying on this instance.
+    if (error?.code === "PGRST202" || /record_ai_usage|function/i.test(error?.message ?? "")) {
+      durableLimiterAvailable = false;
+    }
+    return null;
+  }
+  const row = data as { allowed?: boolean; remaining?: number; limit?: number; reset_in?: number };
+  return {
+    limited: row.allowed === false,
+    remaining: typeof row.remaining === "number" ? Math.max(0, row.remaining) : 0,
+    limit: typeof row.limit === "number" ? row.limit : MAX_PER_WINDOW,
+    resetInSeconds: typeof row.reset_in === "number" ? row.reset_in : Math.floor(WINDOW_MS / 1000),
+  };
+}
+
 export interface PostSuggestion {
   source: number; // 1-based index into the sources the client sent
   platform: string;
@@ -146,7 +174,7 @@ export async function POST(request: Request) {
   const { data } = await supabase.auth.getUser();
   if (!data.user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
-  const usageInfo = recordUsage(data.user.id);
+  const usageInfo = (await recordAiUsage(supabase)) ?? recordUsage(data.user.id);
   if (usageInfo.limited) {
     const mins = Math.max(1, Math.round(usageInfo.resetInSeconds / 60));
     return NextResponse.json(
