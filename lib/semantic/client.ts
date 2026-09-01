@@ -8,8 +8,25 @@ import { createClient } from "../supabase/client";
 async function embed(texts: string[]): Promise<number[][]> {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("embed", { body: { texts } });
-  if (error) throw new Error("The semantic index isn't set up yet.");
-  return (data as { embeddings: number[][] }).embeddings;
+  if (error) {
+    // Surface the real reason (HTTP status + body) so failures are diagnosable
+    // instead of a generic "not set up".
+    let detail = error.message || "request failed";
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.status === "number") {
+        detail = `HTTP ${ctx.status}`;
+        const body = await ctx.clone().json().catch(() => null);
+        if (body && typeof body.error === "string") detail += `: ${body.error.slice(0, 200)}`;
+      }
+    } catch {
+      // best-effort detail extraction
+    }
+    throw new Error(`embed: ${detail}`);
+  }
+  const payload = data as { embeddings?: number[][] } | null;
+  if (!payload?.embeddings) throw new Error("embed: no embeddings returned");
+  return payload.embeddings;
 }
 
 /**
