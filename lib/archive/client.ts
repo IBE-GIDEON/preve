@@ -225,11 +225,16 @@ export async function getArchivePlatformCounts(): Promise<Record<Platform, numbe
   const platforms = Object.keys(platformToDb) as Platform[];
   const entries = await Promise.all(
     platforms.map(async (platform) => {
-      const { count } = await supabase
-        .from("archive_items")
-        .select("*", { count: "exact", head: true })
-        .eq("platform", platformToDb[platform]);
-      return [platform, count ?? 0] as const;
+      // Per-query catch so one failing count can't wipe the whole list.
+      try {
+        const { count } = await supabase
+          .from("archive_items")
+          .select("*", { count: "exact", head: true })
+          .eq("platform", platformToDb[platform]);
+        return [platform, count ?? 0] as const;
+      } catch {
+        return [platform, 0] as const;
+      }
     }),
   );
   return Object.fromEntries(entries) as Record<Platform, number>;

@@ -654,6 +654,12 @@ export default function DashboardPage() {
               <span className="search-mode-hint">Showing keyword matches while the semantic index catches up.</span>
             )}
           </div>
+
+          {/* Filters live in the sticky header so they stay reachable while
+              scrolling the list (no need to scroll back up). */}
+          {!selectedPost && (
+            <div style={{ width: "100%", maxWidth: "640px" }}>{filterBar}</div>
+          )}
         </div>
 
         <AnimatePresence mode="wait">
@@ -759,8 +765,6 @@ export default function DashboardPage() {
               exit={{ opacity: 0, y: -20 }}
               style={{ width: "100%", maxWidth: "640px", marginTop: "3rem" }}
             >
-              {filterBar}
-
               <h4 style={{ opacity: 0.5, marginBottom: "1rem" }}>
                 {serverLoading
                   ? "Searching…"
@@ -790,8 +794,6 @@ export default function DashboardPage() {
               exit={{ opacity: 0, y: -20 }}
               style={{ width: "100%", maxWidth: "640px", marginTop: "3rem" }}
             >
-              {filterBar}
-
               <h4 style={{ opacity: 0.5, marginBottom: "1rem" }}>
                 {filterPlatform === "all"
                   ? `${formatNumber(totals.indexed)} ${totals.indexed === 1 ? "post" : "posts"} in your archive`

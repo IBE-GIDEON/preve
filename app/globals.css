@@ -3035,7 +3035,7 @@ img.settings-avatar {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
 }
 
 .search-filter-select {
