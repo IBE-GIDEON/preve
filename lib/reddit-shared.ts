@@ -45,6 +45,12 @@ function permalinkUrl(d: RedditData): string | null {
   return d.url ?? null;
 }
 
+/** Reddit epoch seconds → ISO, guarding against absurd/NaN values. */
+function redditDate(createdUtc?: number): string {
+  const date = new Date((createdUtc ?? 0) * 1000);
+  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+}
+
 export function normalizeSubmitted(d: RedditData): NormalizedItem {
   return {
     platform_item_id: d.name ?? `t3_${d.id}`,
@@ -54,7 +60,7 @@ export function normalizeSubmitted(d: RedditData): NormalizedItem {
     url: permalinkUrl(d),
     topics: d.subreddit ? [d.subreddit] : [],
     engagement: { likes: d.score ?? 0, comments: d.num_comments ?? 0 },
-    published_at: new Date((d.created_utc ?? 0) * 1000).toISOString(),
+    published_at: redditDate(d.created_utc),
   };
 }
 
@@ -67,6 +73,6 @@ export function normalizeComment(d: RedditData): NormalizedItem {
     url: permalinkUrl(d),
     topics: d.subreddit ? [d.subreddit] : [],
     engagement: { likes: d.score ?? 0, comments: 0 },
-    published_at: new Date((d.created_utc ?? 0) * 1000).toISOString(),
+    published_at: redditDate(d.created_utc),
   };
 }

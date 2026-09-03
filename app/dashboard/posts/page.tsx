@@ -105,6 +105,7 @@ export default function PrevePostsPage() {
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
   const [upgrade, setUpgrade] = useState(false);
   const autoTried = useRef(false);
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Filter chips are fully dynamic: only the platforms actually present among
   // the current ideas (ordered), so a chip never leads to an empty view.
@@ -261,7 +262,9 @@ export default function PrevePostsPage() {
     const next = [...drafts];
     next[index] = value;
     setDrafts(next);
-    persist(suggestions, next, sources);
+    // Debounce persistence so we don't re-serialize the whole blob every keystroke.
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => persist(suggestions, next, sources), 500);
   }
 
   function deleteCard(index: number) {
@@ -269,7 +272,11 @@ export default function PrevePostsPage() {
     const nextDrafts = drafts.filter((_, i) => i !== index);
     setSuggestions(nextSuggestions);
     setDrafts(nextDrafts);
-    if (repurposeOpen === index) setRepurposeOpen(null);
+    // These are absolute indices; shift them so they keep pointing at the right
+    // card after an earlier card is removed.
+    const shift = (cur: number | null) => (cur === null || cur === index ? null : cur > index ? cur - 1 : cur);
+    setRepurposeOpen(shift);
+    setCopiedIndex(shift);
     persist(nextSuggestions, nextDrafts, sources);
   }
 
@@ -432,7 +439,7 @@ export default function PrevePostsPage() {
                 const anyBusy = cardBusy !== null;
                 return (
                   <motion.article
-                    key={`${suggestion.post.slice(0, 24)}-${index}`}
+                    key={`${suggestion.source}-${suggestion.post.slice(0, 64)}`}
                     layout
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}

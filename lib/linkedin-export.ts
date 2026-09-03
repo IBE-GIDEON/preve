@@ -57,7 +57,7 @@ export function parseLinkedInExportCsv(text: string): NormalizedItem[] {
     const iSharedUrl = find((h) => h.includes("sharedurl"));
     const items: NormalizedItem[] = [];
 
-    for (const row of rows.slice(1)) {
+    for (const [rowIndex, row] of rows.slice(1).entries()) {
       const commentary = (row[iCommentary] ?? "").trim();
       const sharedUrl = iSharedUrl !== -1 ? (row[iSharedUrl] ?? "").trim() : "";
       const link = iShareLink !== -1 ? (row[iShareLink] ?? "").trim() : "";
@@ -65,7 +65,9 @@ export function parseLinkedInExportCsv(text: string): NormalizedItem[] {
       if (!body) continue; // reshare with no words of your own — skip
 
       const dateRaw = iDate !== -1 ? row[iDate] ?? "" : "";
-      const id = shareIdFromLink(link) ?? hash36(`${dateRaw}|${body}`);
+      // Include the row index so hash collisions can't overwrite distinct posts;
+      // the file's row order is stable, so re-imports still dedupe.
+      const id = shareIdFromLink(link) ?? hash36(`${dateRaw}|${body}|${rowIndex}`);
 
       items.push({
         platform_item_id: `li_${id}`.slice(0, 40),
@@ -86,7 +88,7 @@ export function parseLinkedInExportCsv(text: string): NormalizedItem[] {
     const iLink = find((h) => h.includes("link"));
     const items: NormalizedItem[] = [];
 
-    for (const row of rows.slice(1)) {
+    for (const [rowIndex, row] of rows.slice(1).entries()) {
       const message = (row[iMessage] ?? "").trim();
       if (!message) continue;
 
@@ -94,7 +96,7 @@ export function parseLinkedInExportCsv(text: string): NormalizedItem[] {
       const dateRaw = iDate !== -1 ? row[iDate] ?? "" : "";
 
       items.push({
-        platform_item_id: `lic_${hash36(`${dateRaw}|${message}`)}`.slice(0, 40),
+        platform_item_id: `lic_${hash36(`${dateRaw}|${message}|${rowIndex}`)}`.slice(0, 40),
         kind: "comment",
         source_title: "LinkedIn comment",
         body: message.slice(0, 40000),

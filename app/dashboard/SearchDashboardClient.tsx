@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   getEngagementScore,
@@ -47,6 +47,42 @@ function formatNumber(value: number) {
 
 function getPlatformLabel(platform: Platform) {
   return platform === "X" ? "X" : platform;
+}
+
+// Render post text with http(s) URLs turned into safe, clickable links. Only
+// http(s) is linkified (no javascript:/data:), links open in a new tab with
+// noopener/noreferrer/nofollow, and clicks don't bubble to the card.
+const URL_RE = /(https?:\/\/[^\s<>"']+)/g;
+function renderWithLinks(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let last = 0;
+  for (const match of text.matchAll(URL_RE)) {
+    const start = match.index ?? 0;
+    let url = match[0];
+    let trailing = "";
+    const trail = url.match(/[.,;:!?)\]}'"]+$/);
+    if (trail) {
+      trailing = trail[0];
+      url = url.slice(0, url.length - trailing.length);
+    }
+    if (start > last) nodes.push(text.slice(last, start));
+    nodes.push(
+      <a
+        key={`${start}-${url}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        onClick={(event) => event.stopPropagation()}
+        style={{ color: "#F05522", textDecoration: "underline", wordBreak: "break-word" }}
+      >
+        {url}
+      </a>,
+    );
+    if (trailing) nodes.push(trailing);
+    last = start + match[0].length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
 }
 
 // The native format the AI repurposes a post into, per platform.
@@ -544,7 +580,7 @@ export default function DashboardPage() {
                 }),
           }}
         >
-          {post.content}
+          {renderWithLinks(post.content)}
         </div>
         {isLong && (
           <button
@@ -733,8 +769,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div style={{ fontSize: "1.2rem", lineHeight: 1.6, color: "var(--foreground)" }}>
-                  {selectedPost.content}
+                <div style={{ fontSize: "1.2rem", lineHeight: 1.6, color: "var(--foreground)", whiteSpace: "pre-wrap" }}>
+                  {renderWithLinks(selectedPost.content)}
                 </div>
 
                 <div
@@ -937,7 +973,11 @@ export default function DashboardPage() {
                   </div>
                 )}
                 <button
-                  onClick={() => selectedPost.url && window.open(selectedPost.url, "_blank", "noopener,noreferrer")}
+                  onClick={() =>
+                    selectedPost.url &&
+                    /^https?:\/\//i.test(selectedPost.url) &&
+                    window.open(selectedPost.url, "_blank", "noopener,noreferrer")
+                  }
                   className="action-btn"
                 >
                   Open original

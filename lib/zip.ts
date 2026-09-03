@@ -10,12 +10,33 @@ const EOCD_SIG = 0x06054b50; // End Of Central Directory
 const CDH_SIG = 0x02014b50; // Central Directory Header
 const LFH_SIG = 0x04034b50; // Local File Header
 
+// Cap decompressed output per entry so a zip bomb can't OOM the tab.
+const MAX_INFLATED_BYTES = 60_000_000;
+
 async function inflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
   // eslint-disable-next-line no-undef
   const ds = new DecompressionStream("deflate-raw");
-  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(ds);
-  const buf = await new Response(stream).arrayBuffer();
-  return new Uint8Array(buf);
+  const reader = new Blob([bytes as BlobPart]).stream().pipeThrough(ds).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.length;
+    if (total > MAX_INFLATED_BYTES) {
+      await reader.cancel();
+      throw new Error("Zip entry too large.");
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
 }
 
 /** Strip any directory path, returning the lowercased base filename. */
@@ -70,17 +91,19 @@ export async function readZipTextEntries(
     if (!wanted(zipBaseName(name))) continue;
 
     // Jump to the local header to find where the file data actually starts.
-    if (view.getUint32(localOffset, true) !== LFH_SIG) continue;
-    const lfhNameLen = view.getUint16(localOffset + 26, true);
-    const lfhExtraLen = view.getUint16(localOffset + 28, true);
-    const dataStart = localOffset + 30 + lfhNameLen + lfhExtraLen;
-    const raw = bytes.subarray(dataStart, dataStart + compSize);
-
+    // Bounds-check the attacker-controlled offset so a bad/ZIP64 entry is skipped
+    // (DataView.get* throws RangeError past the end), not fatal to the import.
+    if (localOffset < 0 || localOffset + 30 > buffer.byteLength) continue;
     try {
+      if (view.getUint32(localOffset, true) !== LFH_SIG) continue;
+      const lfhNameLen = view.getUint16(localOffset + 26, true);
+      const lfhExtraLen = view.getUint16(localOffset + 28, true);
+      const dataStart = localOffset + 30 + lfhNameLen + lfhExtraLen;
+      const raw = bytes.subarray(dataStart, dataStart + compSize);
       const content = method === 0 ? raw : await inflateRaw(raw);
       out[zipBaseName(name)] = decoder.decode(content);
     } catch {
-      // Skip an entry we can't decompress rather than failing the whole import.
+      // Skip an entry we can't read/decompress rather than failing the whole import.
     }
   }
 

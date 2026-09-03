@@ -63,6 +63,9 @@ function countImportItems(rawText: string) {
 // unzipped folder (webkitdirectory). `wanted` picks which files to read (by
 // lowercased basename) both inside a zip and among loose/folder files; `parse`
 // turns each file's text into archive items.
+const MAX_ZIP_BYTES = 300_000_000; // a whole zip is read into memory to index it
+const MAX_TEXT_FILE_BYTES = 80_000_000; // a single CSV/JS we parse
+
 async function collectItemsFromUpload(
   files: FileList,
   wanted: (baseName: string) => boolean,
@@ -72,9 +75,15 @@ async function collectItemsFromUpload(
   for (const file of Array.from(files)) {
     const isZip = file.name.toLowerCase().endsWith(".zip") || file.type.includes("zip");
     if (isZip) {
+      if (file.size > MAX_ZIP_BYTES) {
+        throw new Error("That .zip is very large. Unzip it and use the folder option instead.");
+      }
       const entries = await readZipTextEntries(await file.arrayBuffer(), wanted);
       for (const text of Object.values(entries)) items.push(...parse(text));
     } else if (wanted(file.name.toLowerCase())) {
+      if (file.size > MAX_TEXT_FILE_BYTES) {
+        throw new Error(`${file.name} is too large to import.`);
+      }
       items.push(...parse(await file.text()));
     }
   }

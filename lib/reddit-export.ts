@@ -49,7 +49,11 @@ export function parseCsv(text: string): string[][] {
 /** Export dates look like "2023-01-05 12:34:56 UTC" (sometimes plain ISO). */
 function parseExportDate(raw: string): string {
   const cleaned = (raw ?? "").trim().replace(" UTC", "");
-  const candidate = cleaned.includes("T") ? cleaned : `${cleaned.replace(" ", "T")}Z`;
+  if (!cleaned) return new Date().toISOString();
+  let candidate: string;
+  if (cleaned.includes("T")) candidate = cleaned;
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) candidate = `${cleaned}T00:00:00Z`; // date-only
+  else candidate = `${cleaned.replace(" ", "T")}Z`;
   const date = new Date(candidate);
   return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
 }
