@@ -132,7 +132,7 @@ export default function PrevePostsPage() {
   }, [posts]);
 
   function persist(nextSuggestions: StoredSuggestion[], nextDrafts: string[], nextSources: SourceRef[]) {
-    saveStoredPosts({
+    void saveStoredPosts({
       sources: nextSources.map((s) => ({ id: s.id, text: s.text, platform: s.platform, date: s.date })),
       suggestions: nextSuggestions,
       drafts: nextDrafts,
@@ -140,22 +140,32 @@ export default function PrevePostsPage() {
   }
 
   useEffect(() => {
-    const stored = loadStoredPosts();
-    if (stored) {
-      setSources(stored.sources.map((s) => ({ ...s, platform: s.platform as Platform })));
-      setSuggestions(stored.suggestions);
-      setDrafts(stored.drafts);
-    }
-
-    loadArchivePostsCached((result) => {
-      setPosts(result.posts);
-      setLoadingArchive(false);
-      // First visit with an archive but nothing saved → seed a few waiting ideas.
-      if (!stored && !autoTried.current && result.posts.length > 0) {
-        autoTried.current = true;
-        void generate(3, result.posts);
+    let cancelled = false;
+    // Load the user's saved ideas first (per-user key), then the archive — so
+    // auto-seed only fires when there's genuinely nothing saved for this user.
+    (async () => {
+      const stored = await loadStoredPosts();
+      if (cancelled) return;
+      if (stored) {
+        setSources(stored.sources.map((s) => ({ ...s, platform: s.platform as Platform })));
+        setSuggestions(stored.suggestions);
+        setDrafts(stored.drafts);
       }
-    }).catch(() => setLoadingArchive(false));
+      await loadArchivePostsCached((result) => {
+        if (cancelled) return;
+        setPosts(result.posts);
+        setLoadingArchive(false);
+        if (!stored && !autoTried.current && result.posts.length > 0) {
+          autoTried.current = true;
+          void generate(3, result.posts);
+        }
+      });
+    })().catch(() => {
+      if (!cancelled) setLoadingArchive(false);
+    });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

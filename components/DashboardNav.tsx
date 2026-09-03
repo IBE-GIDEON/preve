@@ -39,7 +39,9 @@ export default function DashboardNav({ variant = "sidebar" }: { variant?: "sideb
   // a custom event (same tab) and the storage event (other tabs).
   const [waitingPosts, setWaitingPosts] = useState(0);
   useEffect(() => {
-    const update = () => setWaitingPosts(countStoredPosts());
+    const update = () => {
+      void countStoredPosts().then(setWaitingPosts);
+    };
     update();
     window.addEventListener(PREVE_POSTS_EVENT, update);
     window.addEventListener("storage", update);

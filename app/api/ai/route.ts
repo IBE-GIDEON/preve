@@ -62,12 +62,22 @@ async function recordAiUsage(
   supabase: Awaited<ReturnType<typeof createClient>>,
   feature: string,
   limit: number,
-): Promise<UsageInfo | null> {
+): Promise<UsageInfo | null | "unavailable"> {
   const { data, error } = await supabase.rpc("record_ai_usage", {
     max_per_window: limit,
     feature_key: feature,
   });
-  if (error || !data) return null;
+  if (error) {
+    const code = (error as { code?: string }).code ?? "";
+    const message = error.message ?? "";
+    // Function genuinely missing (migration not applied) → in-memory fallback.
+    if (code === "PGRST202" || code === "42883" || /record_ai_usage|schema cache|does not exist/i.test(message)) {
+      return null;
+    }
+    // Any other (transient) error → fail CLOSED so retries can't slip the cap.
+    return "unavailable";
+  }
+  if (!data) return null;
   const row = data as { allowed?: boolean; remaining?: number; limit?: number; reset_in?: number };
   return {
     limited: row.allowed === false,
@@ -202,8 +212,14 @@ export async function POST(request: Request) {
   const feature = isSuggest ? "suggest" : "general";
   const limit = isSuggest ? SUGGEST_PER_DAY : GENERAL_PER_DAY;
 
-  const usageInfo =
-    (await recordAiUsage(supabase, feature, limit)) ?? recordUsage(data.user.id, feature, limit);
+  const durable = await recordAiUsage(supabase, feature, limit);
+  if (durable === "unavailable") {
+    return NextResponse.json(
+      { error: "AI is briefly unavailable — please try again in a moment." },
+      { status: 503 },
+    );
+  }
+  const usageInfo = durable ?? recordUsage(data.user.id, feature, limit);
   if (usageInfo.limited) {
     const what = isSuggest ? "post idea generations" : "AI actions";
     return NextResponse.json(

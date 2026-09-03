@@ -2,6 +2,7 @@
 // app. A user's public posts are readable from their instance without auth.
 // Server-side (uses global fetch); no secrets, so it stays a shared module.
 
+import { assertSafeHttpUrl } from "./net/safe-fetch";
 import type { NormalizedItem } from "./reddit-shared";
 
 const USER_AGENT = "web:preve:1.0 (personal content archive)";
@@ -105,10 +106,9 @@ function normalizeStatus(s: MastodonStatus): NormalizedItem | null {
 }
 
 async function lookupAccountId(instance: string, username: string): Promise<string> {
-  const res = await fetch(
-    `https://${instance}/api/v1/accounts/lookup?acct=${encodeURIComponent(username)}`,
-    { headers: { Accept: "application/json", "User-Agent": USER_AGENT } },
-  );
+  const lookupUrl = `https://${instance}/api/v1/accounts/lookup?acct=${encodeURIComponent(username)}`;
+  assertSafeHttpUrl(lookupUrl); // block private/loopback instance hosts (SSRF)
+  const res = await fetch(lookupUrl, { headers: { Accept: "application/json", "User-Agent": USER_AGENT } });
   if (res.status === 404) throw new FatalMastodonError("That Mastodon account doesn't exist.");
   if (res.status === 401 || res.status === 403) {
     throw new FatalMastodonError("That instance requires login to read posts. Try a public instance handle.");
@@ -133,7 +133,9 @@ export async function fetchMastodonPublicArchive(rawHandle: string, maxPages = 1
     const params = new URLSearchParams({ limit: "40", exclude_reblogs: "true" });
     if (maxId) params.set("max_id", maxId);
 
-    const res = await fetch(`https://${instance}/api/v1/accounts/${accountId}/statuses?${params.toString()}`, {
+    const statusesUrl = `https://${instance}/api/v1/accounts/${accountId}/statuses?${params.toString()}`;
+    assertSafeHttpUrl(statusesUrl); // block private/loopback instance hosts (SSRF)
+    const res = await fetch(statusesUrl, {
       headers: { Accept: "application/json", "User-Agent": USER_AGENT },
     });
     if (!res.ok) throw new Error(`Mastodon fetch failed (${res.status}).`);

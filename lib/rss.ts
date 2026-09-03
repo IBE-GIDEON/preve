@@ -3,6 +3,7 @@
 // CORS headers, and this keeps parsing off the client).
 
 import { htmlToText } from "./mastodon-shared";
+import { safeFetchText } from "./net/safe-fetch";
 import type { NormalizedItem } from "./reddit-shared";
 
 const USER_AGENT = "web:preve:1.0 (personal content archive)";
@@ -148,14 +149,21 @@ function looksLikeFeed(text: string): boolean {
 }
 
 async function fetchText(url: string): Promise<{ ok: boolean; text: string; contentType: string }> {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8",
-    },
-  });
-  const text = res.ok ? await res.text() : "";
-  return { ok: res.ok, text, contentType: res.headers.get("content-type") ?? "" };
+  // safeFetchText enforces SSRF protection (blocks private/loopback hosts,
+  // https-only redirects, size + time caps).
+  try {
+    const text = await safeFetchText(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8",
+      },
+      maxBytes: 5_000_000,
+      timeoutMs: 10_000,
+    });
+    return { ok: true, text, contentType: "" };
+  } catch {
+    return { ok: false, text: "", contentType: "" };
+  }
 }
 
 function findFeedLinkInHtml(html: string, baseUrl: string): string | null {

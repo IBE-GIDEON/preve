@@ -1,8 +1,11 @@
 "use client";
 
-// Persists the "preve Posts" idea stack in localStorage so ideas are already
-// WAITING on the next visit (no fresh AI call) and the nav can show a badge.
-// Client-only; best-effort (never throws on storage failure).
+// Persists the "preve Posts" idea stack in localStorage, namespaced per user, so
+// ideas are already WAITING on the next visit (no fresh AI call) and the nav can
+// show a badge — without leaking one account's drafts to another on a shared
+// browser. Client-only; best-effort (never throws on storage failure).
+
+import { createClient } from "./supabase/client";
 
 export interface StoredSourceRef {
   id: string;
@@ -24,12 +27,26 @@ export interface StoredPosts {
 }
 
 export const PREVE_POSTS_EVENT = "preve:posts-changed";
-const KEY = "preve:posts:v1";
+const PREFIX = "preve:posts:v1:";
 
-export function loadStoredPosts(): StoredPosts | null {
-  if (typeof window === "undefined") return null;
+/** The current user's storage key, or null if signed out. Local read only. */
+async function keyForUser(): Promise<string | null> {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const supabase = createClient();
+    const { data } = await supabase.auth.getSession(); // reads local session, no network
+    const uid = data.session?.user?.id;
+    return uid ? `${PREFIX}${uid}` : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadStoredPosts(): Promise<StoredPosts | null> {
+  if (typeof window === "undefined") return null;
+  const key = await keyForUser();
+  if (!key) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as StoredPosts;
     if (!parsed || !Array.isArray(parsed.suggestions) || !Array.isArray(parsed.drafts)) return null;
@@ -40,27 +57,31 @@ export function loadStoredPosts(): StoredPosts | null {
   }
 }
 
-export function saveStoredPosts(data: StoredPosts): void {
+export async function saveStoredPosts(data: StoredPosts): Promise<void> {
   if (typeof window === "undefined") return;
+  const key = await keyForUser();
+  if (!key) return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(data));
+    window.localStorage.setItem(key, JSON.stringify(data));
   } catch {
     // storage full/unavailable — ignore
   }
   window.dispatchEvent(new CustomEvent(PREVE_POSTS_EVENT));
 }
 
-export function clearStoredPosts(): void {
+export async function clearStoredPosts(): Promise<void> {
   if (typeof window === "undefined") return;
+  const key = await keyForUser();
+  if (!key) return;
   try {
-    window.localStorage.removeItem(KEY);
+    window.localStorage.removeItem(key);
   } catch {
     // ignore
   }
   window.dispatchEvent(new CustomEvent(PREVE_POSTS_EVENT));
 }
 
-export function countStoredPosts(): number {
-  const stored = loadStoredPosts();
+export async function countStoredPosts(): Promise<number> {
+  const stored = await loadStoredPosts();
   return stored ? stored.suggestions.length : 0;
 }

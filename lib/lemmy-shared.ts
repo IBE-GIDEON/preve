@@ -1,6 +1,7 @@
 // Lemmy import via the public v3 API — open and federated, no keys. A user's
 // posts + comments are readable from their instance without auth.
 
+import { assertSafeHttpUrl } from "./net/safe-fetch";
 import type { NormalizedItem } from "./reddit-shared";
 
 const USER_AGENT = "web:preve:1.0 (personal content archive)";
@@ -87,7 +88,9 @@ export async function fetchLemmyArchive(rawHandle: string, maxPages = 5): Promis
   const items: NormalizedItem[] = [];
   for (let page = 1; page <= maxPages; page++) {
     const params = new URLSearchParams({ username, sort: "New", limit: "50", page: String(page) });
-    const res = await fetch(`https://${instance}/api/v3/user?${params.toString()}`, {
+    const userUrl = `https://${instance}/api/v3/user?${params.toString()}`;
+    assertSafeHttpUrl(userUrl); // block private/loopback instance hosts (SSRF)
+    const res = await fetch(userUrl, {
       headers: { Accept: "application/json", "User-Agent": USER_AGENT },
     });
     if (res.status === 404 || res.status === 400) {
