@@ -6,7 +6,7 @@ import type { Platform, Post, PostKind } from "../../data/mockPosts";
 import { getPlatformColor } from "../../data/mockPosts";
 import { PLATFORM_ORDER } from "../../lib/preveState";
 import { PlatformIcon } from "../../../components/PlatformIcon";
-import { deleteArchiveByPlatform, getArchiveStats, importManualArchive, loadArchivePostsCached } from "../../../lib/archive/client";
+import { deleteArchiveByPlatform, getArchivePlatformCounts, importManualArchive, loadArchivePostsCached } from "../../../lib/archive/client";
 import ConfirmDialog from "../../../components/ConfirmDialog";
 import { buildEmbeddings } from "../../../lib/semantic/client";
 import { getConnectPlatform } from "../../../lib/connect-platforms";
@@ -100,6 +100,17 @@ function importAgo(iso: string) {
 
 export default function ImportsPage() {
   const [archivePosts, setArchivePosts] = useState<Post[]>([]);
+  const [platformCounts, setPlatformCounts] = useState<Record<Platform, number>>({
+    Reddit: 0,
+    X: 0,
+    LinkedIn: 0,
+    Bluesky: 0,
+    Mastodon: 0,
+    RSS: 0,
+    HackerNews: 0,
+    Devto: 0,
+    Lemmy: 0,
+  });
   const [platform, setPlatform] = useState<Platform>("Reddit");
   const [kind, setKind] = useState<PostKind>("Post");
   const [sourceTitle, setSourceTitle] = useState("");
@@ -145,7 +156,13 @@ export default function ImportsPage() {
   const twitterFolderInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
+  const totals = useMemo(
+    () => ({
+      indexed: (Object.values(platformCounts) as number[]).reduce((sum, n) => sum + n, 0),
+      platformCounts,
+    }),
+    [platformCounts],
+  );
   const importCount = countImportItems(rawText);
   const connectedPlatforms = PLATFORM_ORDER.filter((item) => totals.platformCounts[item] > 0).length;
   const redditIcon = getPlatformIcon("Reddit");
@@ -181,6 +198,8 @@ export default function ImportsPage() {
         setLoading(false);
       });
       getRecentImportJobs().then(setImportJobs).catch(() => {});
+      // Accurate per-platform totals from the DB (not the capped cache).
+      void getArchivePlatformCounts().then(setPlatformCounts).catch(() => {});
       // Warm the semantic index in the background so Semantic search is ready
       // (no-op once everything is embedded; failures are non-fatal).
       void buildEmbeddings().catch(() => {});
