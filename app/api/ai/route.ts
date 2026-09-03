@@ -5,8 +5,9 @@ import { createClient } from "../../../lib/supabase/server";
 export const maxDuration = 60;
 
 // Per-user DAILY AI caps, by feature bucket. Free tier for now; Premium
-// (coming soon) lifts these.
-const WINDOW_MS = 24 * 60 * 60_000; // 1 day
+// (coming soon) lifts these. Quota is a CALENDAR DAY that resets at midnight
+// UTC — a new day gives a fresh quota no matter when it was last used — not a
+// rolling 24h window.
 const GENERAL_PER_DAY = 30; // repurpose, rewrite, compose, summarize, expand…
 const SUGGEST_PER_DAY = 5; // preve Posts idea generations
 
@@ -17,24 +18,36 @@ interface UsageInfo {
   resetInSeconds: number;
 }
 
+/** Midnight UTC of the current day, in ms. */
+function utcDayStartMs(now: number): number {
+  const d = new Date(now);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** Seconds until the next midnight UTC (when the quota refreshes). */
+function secondsUntilUtcMidnight(now: number): number {
+  return Math.max(1, Math.ceil((utcDayStartMs(now) + 86_400_000 - now) / 1000));
+}
+
 // In-memory fallback limiter, used only until the durable Postgres limiter
-// (record_ai_usage) is available. Keyed per user AND feature bucket.
+// (record_ai_usage) is available. Keyed per user AND feature bucket; counts
+// only calls made since midnight UTC today, so it resets on the day boundary.
 const usage = new Map<string, number[]>();
 
 function recordUsage(userId: string, feature: string, limit: number): UsageInfo {
   const key = `${userId}:${feature}`;
   const now = Date.now();
-  const stamps = (usage.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
-  const resetIn = (list: number[]) =>
-    list.length ? Math.max(1, Math.ceil((WINDOW_MS - (now - list[0])) / 1000)) : Math.ceil(WINDOW_MS / 1000);
+  const dayStart = utcDayStartMs(now);
+  const resetInSeconds = secondsUntilUtcMidnight(now);
+  const stamps = (usage.get(key) ?? []).filter((t) => t >= dayStart);
 
   if (stamps.length >= limit) {
     usage.set(key, stamps);
-    return { limited: true, remaining: 0, limit, resetInSeconds: resetIn(stamps) };
+    return { limited: true, remaining: 0, limit, resetInSeconds };
   }
   stamps.push(now);
   usage.set(key, stamps);
-  return { limited: false, remaining: limit - stamps.length, limit, resetInSeconds: resetIn(stamps) };
+  return { limited: false, remaining: limit - stamps.length, limit, resetInSeconds };
 }
 
 function usagePayload(info: UsageInfo) {
@@ -49,11 +62,9 @@ async function recordAiUsage(
   supabase: Awaited<ReturnType<typeof createClient>>,
   feature: string,
   limit: number,
-  windowSeconds: number,
 ): Promise<UsageInfo | null> {
   const { data, error } = await supabase.rpc("record_ai_usage", {
     max_per_window: limit,
-    window_seconds: windowSeconds,
     feature_key: feature,
   });
   if (error || !data) return null;
@@ -62,7 +73,7 @@ async function recordAiUsage(
     limited: row.allowed === false,
     remaining: typeof row.remaining === "number" ? Math.max(0, row.remaining) : 0,
     limit: typeof row.limit === "number" ? row.limit : limit,
-    resetInSeconds: typeof row.reset_in === "number" ? row.reset_in : windowSeconds,
+    resetInSeconds: typeof row.reset_in === "number" ? row.reset_in : secondsUntilUtcMidnight(Date.now()),
   };
 }
 
@@ -190,10 +201,9 @@ export async function POST(request: Request) {
   const isSuggest = action === "suggest";
   const feature = isSuggest ? "suggest" : "general";
   const limit = isSuggest ? SUGGEST_PER_DAY : GENERAL_PER_DAY;
-  const daySeconds = Math.floor(WINDOW_MS / 1000);
 
   const usageInfo =
-    (await recordAiUsage(supabase, feature, limit, daySeconds)) ?? recordUsage(data.user.id, feature, limit);
+    (await recordAiUsage(supabase, feature, limit)) ?? recordUsage(data.user.id, feature, limit);
   if (usageInfo.limited) {
     const what = isSuggest ? "post idea generations" : "AI actions";
     return NextResponse.json(

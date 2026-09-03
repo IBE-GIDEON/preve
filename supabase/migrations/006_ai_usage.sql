@@ -1,7 +1,7 @@
--- M4: durable per-user, per-feature AI rate limiting. Replaces the in-memory
--- limiter (reset on every cold start, not shared across instances). Two buckets:
--- 'general' AI actions and 'suggest' (preve Posts idea generations), each with
--- its own daily cap. Safe to re-run.
+-- M4: durable per-user, per-feature AI rate limiting. Two buckets ('general'
+-- and 'suggest'), each with its own CALENDAR-DAY cap that resets at midnight
+-- UTC — a new day gives a fresh quota no matter when it was last used, NOT a
+-- rolling 24h window. Safe to re-run.
 
 create table if not exists public.ai_usage (
   id bigint generated always as identity primary key,
@@ -23,11 +23,14 @@ create policy "ai_usage_owner_all" on public.ai_usage
   for all using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
--- Atomically records one action in the caller's `feature` bucket and reports
--- remaining quota. Advisory lock (keyed on user+feature) serializes concurrent
--- calls so the cap is strict. security invoker => RLS applies; user is auth.uid().
+-- Records one action in the caller's `feature` bucket for TODAY (midnight UTC to
+-- midnight UTC) and reports remaining quota + seconds until the next reset.
+-- Advisory lock (per user+feature) keeps the count strict. security invoker =>
+-- RLS applies; user is always auth.uid(). Older signatures dropped first so the
+-- 2-arg version is unambiguous.
 drop function if exists public.record_ai_usage(int, int);
-create or replace function public.record_ai_usage(max_per_window int, window_seconds int, feature_key text default 'general')
+drop function if exists public.record_ai_usage(int, int, text);
+create or replace function public.record_ai_usage(max_per_window int, feature_key text default 'general')
 returns json
 language plpgsql
 security invoker
@@ -35,38 +38,31 @@ set search_path = public
 as $$
 declare
   uid uuid := (select auth.uid());
+  day_start timestamptz := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+  next_reset timestamptz := (date_trunc('day', now() at time zone 'UTC') at time zone 'UTC') + interval '1 day';
+  reset_in int := greatest(1, ceil(extract(epoch from (next_reset - now()))))::int;
   used int;
-  reset_at timestamptz;
 begin
   if uid is null then
-    return json_build_object('allowed', false, 'remaining', 0, 'limit', max_per_window, 'reset_in', window_seconds);
+    return json_build_object('allowed', false, 'remaining', 0, 'limit', max_per_window, 'reset_in', reset_in);
   end if;
 
   perform pg_advisory_xact_lock(hashtext(uid::text || ':' || feature_key)::bigint);
 
+  -- Drop rows from previous days so the count is just today's usage.
   delete from public.ai_usage
-    where user_id = uid and feature = feature_key
-      and created_at < now() - make_interval(secs => window_seconds);
+    where user_id = uid and feature = feature_key and created_at < day_start;
 
   select count(*) into used from public.ai_usage where user_id = uid and feature = feature_key;
 
   if used >= max_per_window then
-    select min(created_at) + make_interval(secs => window_seconds) into reset_at
-      from public.ai_usage where user_id = uid and feature = feature_key;
-    return json_build_object(
-      'allowed', false, 'remaining', 0, 'limit', max_per_window,
-      'reset_in', greatest(1, ceil(extract(epoch from (reset_at - now()))))::int);
+    return json_build_object('allowed', false, 'remaining', 0, 'limit', max_per_window, 'reset_in', reset_in);
   end if;
 
   insert into public.ai_usage (user_id, feature) values (uid, feature_key);
   used := used + 1;
-
-  select min(created_at) + make_interval(secs => window_seconds) into reset_at
-    from public.ai_usage where user_id = uid and feature = feature_key;
-  return json_build_object(
-    'allowed', true, 'remaining', max_per_window - used, 'limit', max_per_window,
-    'reset_in', greatest(1, ceil(extract(epoch from (reset_at - now()))))::int);
+  return json_build_object('allowed', true, 'remaining', max_per_window - used, 'limit', max_per_window, 'reset_in', reset_in);
 end;
 $$;
 
-grant execute on function public.record_ai_usage(int, int, text) to authenticated;
+grant execute on function public.record_ai_usage(int, text) to authenticated;

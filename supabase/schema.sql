@@ -220,7 +220,8 @@ create policy "ai_usage_owner_all" on public.ai_usage
   with check ((select auth.uid()) = user_id);
 
 drop function if exists public.record_ai_usage(int, int);
-create or replace function public.record_ai_usage(max_per_window int, window_seconds int, feature_key text default 'general')
+drop function if exists public.record_ai_usage(int, int, text);
+create or replace function public.record_ai_usage(max_per_window int, feature_key text default 'general')
 returns json
 language plpgsql
 security invoker
@@ -228,38 +229,31 @@ set search_path = public
 as $$
 declare
   uid uuid := (select auth.uid());
+  day_start timestamptz := date_trunc('day', now() at time zone 'UTC') at time zone 'UTC';
+  next_reset timestamptz := (date_trunc('day', now() at time zone 'UTC') at time zone 'UTC') + interval '1 day';
+  reset_in int := greatest(1, ceil(extract(epoch from (next_reset - now()))))::int;
   used int;
-  reset_at timestamptz;
 begin
   if uid is null then
-    return json_build_object('allowed', false, 'remaining', 0, 'limit', max_per_window, 'reset_in', window_seconds);
+    return json_build_object('allowed', false, 'remaining', 0, 'limit', max_per_window, 'reset_in', reset_in);
   end if;
 
   perform pg_advisory_xact_lock(hashtext(uid::text || ':' || feature_key)::bigint);
 
+  -- Drop rows from previous days so the count is just today's usage.
   delete from public.ai_usage
-    where user_id = uid and feature = feature_key
-      and created_at < now() - make_interval(secs => window_seconds);
+    where user_id = uid and feature = feature_key and created_at < day_start;
 
   select count(*) into used from public.ai_usage where user_id = uid and feature = feature_key;
 
   if used >= max_per_window then
-    select min(created_at) + make_interval(secs => window_seconds) into reset_at
-      from public.ai_usage where user_id = uid and feature = feature_key;
-    return json_build_object(
-      'allowed', false, 'remaining', 0, 'limit', max_per_window,
-      'reset_in', greatest(1, ceil(extract(epoch from (reset_at - now()))))::int);
+    return json_build_object('allowed', false, 'remaining', 0, 'limit', max_per_window, 'reset_in', reset_in);
   end if;
 
   insert into public.ai_usage (user_id, feature) values (uid, feature_key);
   used := used + 1;
-
-  select min(created_at) + make_interval(secs => window_seconds) into reset_at
-    from public.ai_usage where user_id = uid and feature = feature_key;
-  return json_build_object(
-    'allowed', true, 'remaining', max_per_window - used, 'limit', max_per_window,
-    'reset_in', greatest(1, ceil(extract(epoch from (reset_at - now()))))::int);
+  return json_build_object('allowed', true, 'remaining', max_per_window - used, 'limit', max_per_window, 'reset_in', reset_in);
 end;
 $$;
 
-grant execute on function public.record_ai_usage(int, int, text) to authenticated;
+grant execute on function public.record_ai_usage(int, text) to authenticated;
