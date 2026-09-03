@@ -115,6 +115,7 @@ export default function ImportsPage() {
   const exportInputRef = useRef<HTMLInputElement>(null);
   const linkedinInputRef = useRef<HTMLInputElement>(null);
   const twitterInputRef = useRef<HTMLInputElement>(null);
+  const twitterFolderInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const totals = useMemo(() => getArchiveStats(archivePosts), [archivePosts]);
@@ -133,6 +134,12 @@ export default function ImportsPage() {
 
   useEffect(() => {
     void refreshArchive();
+  }, []);
+
+  // Enable whole-folder selection on the X input (for archives users already
+  // unzipped). webkitdirectory isn't a typed React prop, so set it imperatively.
+  useEffect(() => {
+    twitterFolderInputRef.current?.setAttribute("webkitdirectory", "");
   }, []);
 
   async function refreshArchive() {
@@ -500,12 +507,16 @@ export default function ImportsPage() {
         if (isZip) {
           const entries = await readZipTextEntries(await file.arrayBuffer(), isTwitterExportFile);
           for (const text of Object.values(entries)) items.push(...parseTwitterExportJs(text));
-        } else {
+        } else if (isTwitterExportFile(file.name)) {
+          // A folder selection includes assets/account.js/the .html too — only
+          // parse the tweet file(s) (data/tweets.js, tweets-part*.js).
           items.push(...parseTwitterExportJs(await file.text()));
         }
       }
       if (items.length === 0) {
-        throw new Error("No tweets found. Drop the .zip X emailed you, or its tweets.js file.");
+        throw new Error(
+          "No tweets found. Drop the .zip, pick the extracted archive folder, or select data/tweets.js.",
+        );
       }
 
       const imported = await ingestTwitterInChunks(items);
@@ -519,6 +530,7 @@ export default function ImportsPage() {
     } finally {
       setTwitterImporting(false);
       if (twitterInputRef.current) twitterInputRef.current.value = "";
+      if (twitterFolderInputRef.current) twitterFolderInputRef.current.value = "";
     }
   }
 
@@ -837,20 +849,37 @@ export default function ImportsPage() {
                 X emails you a <code>.zip</code> when it&rsquo;s ready (can take up to 24&nbsp;h).
               </li>
               <li>
-                Drop the whole <code>.zip</code> below &mdash; preve finds <code>tweets.js</code> inside and skips
-                retweets.
+                Either drop the <code>.zip</code>, <strong>or</strong> if you already unzipped it, pick the extracted
+                archive folder (the one containing <code>data</code>) &mdash; preve finds <code>tweets.js</code> itself
+                and skips retweets.
               </li>
             </ol>
 
-            <input
-              ref={twitterInputRef}
-              type="file"
-              accept=".zip,.js,application/zip"
-              multiple
-              disabled={twitterImporting}
-              onChange={(event) => void handleTwitterExportUpload(event.target.files)}
-              style={{ fontSize: "0.85rem", opacity: twitterImporting ? 0.5 : 0.9, maxWidth: "100%" }}
-            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "flex-start" }}>
+              <label style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <span style={{ opacity: 0.7 }}>The .zip (or a tweets.js file)</span>
+                <input
+                  ref={twitterInputRef}
+                  type="file"
+                  accept=".zip,.js,application/zip"
+                  multiple
+                  disabled={twitterImporting}
+                  onChange={(event) => void handleTwitterExportUpload(event.target.files)}
+                  style={{ fontSize: "0.85rem", opacity: twitterImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+                />
+              </label>
+              <label style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <span style={{ opacity: 0.7 }}>Or the unzipped folder</span>
+                <input
+                  ref={twitterFolderInputRef}
+                  type="file"
+                  multiple
+                  disabled={twitterImporting}
+                  onChange={(event) => void handleTwitterExportUpload(event.target.files)}
+                  style={{ fontSize: "0.85rem", opacity: twitterImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+                />
+              </label>
+            </div>
             {twitterImporting && (
               <div style={{ fontSize: "0.85rem", opacity: 0.6, marginTop: "0.5rem" }}>Reading your archive…</div>
             )}
