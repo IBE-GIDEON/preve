@@ -98,6 +98,48 @@ function importAgo(iso: string) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+interface JobGroup {
+  key: string;
+  platform: string;
+  status: ImportJob["status"];
+  items: number;
+  batches: number;
+  at: string | null;
+  error: string | null;
+}
+
+// Chunked imports create one job per batch; collapse consecutive same-platform
+// jobs from the same import (within 15 min) into a single summary row.
+function groupImportJobs(jobs: ImportJob[]): JobGroup[] {
+  const groups: JobGroup[] = [];
+  for (const job of jobs) {
+    const at = job.completedAt || job.startedAt;
+    const t = at ? new Date(at).getTime() : 0;
+    const prev = groups[groups.length - 1];
+    const prevT = prev?.at ? new Date(prev.at).getTime() : 0;
+    if (
+      prev &&
+      prev.platform === job.platform &&
+      prev.status === job.status &&
+      Math.abs(prevT - t) < 15 * 60 * 1000
+    ) {
+      prev.items += job.importedItems;
+      prev.batches += 1;
+    } else {
+      groups.push({
+        key: job.id,
+        platform: job.platform,
+        status: job.status,
+        items: job.importedItems,
+        batches: 1,
+        at,
+        error: job.error,
+      });
+    }
+  }
+  return groups;
+}
+
 export default function ImportsPage() {
   const [archivePosts, setArchivePosts] = useState<Post[]>([]);
   const [platformCounts, setPlatformCounts] = useState<Record<Platform, number>>({
@@ -197,7 +239,7 @@ export default function ImportsPage() {
         setArchivePosts(result.posts);
         setLoading(false);
       });
-      getRecentImportJobs().then(setImportJobs).catch(() => {});
+      getRecentImportJobs(40).then(setImportJobs).catch(() => {});
       // Accurate per-platform totals from the DB (not the capped cache).
       void getArchivePlatformCounts().then(setPlatformCounts).catch(() => {});
       // Warm the semantic index in the background so Semantic search is ready
@@ -1611,23 +1653,20 @@ export default function ImportsPage() {
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                {importJobs.map((job) => (
-                  <div key={job.id} style={{ fontSize: "0.85rem" }}>
+                {groupImportJobs(importJobs).map((group) => (
+                  <div key={group.key} style={{ fontSize: "0.85rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
-                      <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{job.platform}</span>
-                      <span style={{ color: jobStatusColor(job.status), fontWeight: 600 }}>
-                        {jobStatusLabel(job.status)}
+                      <span style={{ fontWeight: 600, textTransform: "capitalize" }}>{group.platform}</span>
+                      <span style={{ color: jobStatusColor(group.status), fontWeight: 600 }}>
+                        {jobStatusLabel(group.status)}
                       </span>
                     </div>
                     <div style={{ opacity: 0.55, marginTop: "0.15rem" }}>
-                      {job.status === "failed"
-                        ? job.error ?? "Import failed"
-                        : `${formatNumber(job.importedItems)} items`}
-                      {job.completedAt
-                        ? ` · ${importAgo(job.completedAt)}`
-                        : job.startedAt
-                          ? ` · ${importAgo(job.startedAt)}`
-                          : ""}
+                      {group.status === "failed"
+                        ? group.error ?? "Import failed"
+                        : `${formatNumber(group.items)} items`}
+                      {group.batches > 1 ? ` · ${group.batches} batches` : ""}
+                      {group.at ? ` · ${importAgo(group.at)}` : ""}
                     </div>
                   </div>
                 ))}
