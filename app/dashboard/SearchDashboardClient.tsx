@@ -163,8 +163,14 @@ export default function DashboardPage() {
       .catch(() => setPostCollectionIds([]));
   }, [selectedPost?.id]);
 
+  // Tracks the currently-open post so an in-flight AI call can bail if the user
+  // switches away (prevents a result rendering under the wrong post).
+  const selectedPostIdRef = useRef<string | null>(null);
+  selectedPostIdRef.current = selectedPost?.id ?? null;
+
   async function runAi(action: string, format?: string) {
     if (!selectedPost || aiLoading) return;
+    const forPostId = selectedPost.id; // ignore the result if the user switches posts
     setAiLoading(true);
     setAiError("");
     setGeneratedRewrite("");
@@ -175,13 +181,16 @@ export default function DashboardPage() {
         body: JSON.stringify({ action, format, text: selectedPost.content }),
       });
       const data = await res.json().catch(() => ({}));
+      if (selectedPostIdRef.current !== forPostId) return; // a different post is open now
       if (data.usage) setAiUsage({ remaining: data.usage.remaining, limit: data.usage.limit });
       if (!res.ok) throw new Error(data.error || "AI request failed.");
       setGeneratedRewrite(data.result || "");
     } catch (error) {
-      setAiError(error instanceof Error ? error.message : "AI request failed.");
+      if (selectedPostIdRef.current === forPostId) {
+        setAiError(error instanceof Error ? error.message : "AI request failed.");
+      }
     } finally {
-      setAiLoading(false);
+      if (selectedPostIdRef.current === forPostId) setAiLoading(false);
     }
   }
 
@@ -485,8 +494,9 @@ export default function DashboardPage() {
 
   function renderPostCard(post: Post) {
     const isExpanded = expandedPosts.has(post.id);
-    // Roughly two lines at card width; only offer the toggle when there's more.
-    const isLong = post.content.length > 140;
+    // Offer the toggle when the text likely exceeds the 2-line clamp: long text,
+    // or short text that wraps because it contains line breaks.
+    const isLong = post.content.length > 140 || post.content.includes("\n");
 
     return (
       <motion.div

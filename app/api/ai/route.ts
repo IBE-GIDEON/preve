@@ -212,6 +212,22 @@ export async function POST(request: Request) {
   const feature = isSuggest ? "suggest" : "general";
   const limit = isSuggest ? SUGGEST_PER_DAY : GENERAL_PER_DAY;
 
+  // Validate inputs BEFORE metering, so a bad request never consumes daily quota.
+  if (isSuggest) {
+    const hasSources =
+      Array.isArray(body.sources) &&
+      body.sources.some((s) => s && typeof s === "object" && typeof s.text === "string" && s.text.trim().length > 0);
+    if (!hasSources) {
+      return NextResponse.json({ error: "Import some posts first — the AI needs your history to riff on." }, { status: 400 });
+    }
+  } else if (action === "repurpose" || action === "compose" || PROMPTS[action]) {
+    if (!(body.text ?? "").trim()) {
+      return NextResponse.json({ error: "Nothing to work with." }, { status: 400 });
+    }
+  } else {
+    return NextResponse.json({ error: "Unknown action." }, { status: 400 });
+  }
+
   const durable = await recordAiUsage(supabase, feature, limit);
   if (durable === "unavailable") {
     return NextResponse.json(
@@ -268,7 +284,7 @@ export async function POST(request: Request) {
     const userMessage = `My past posts:\n${list}\n\nWrite ${count} new posts I could publish next. Vary the topics and angles across them.${allowedPlatforms.length ? ` Spread them across these platforms where it makes sense: ${allowedPlatforms.join(", ")}.` : ""} Return the JSON object only.`;
 
     try {
-      const raw = await chatComplete(system, userMessage, { jsonMode: true, maxTokens: 2048 });
+      const raw = await chatComplete(system, userMessage, { jsonMode: true, maxTokens: 4096 });
       const suggestions = parseSuggestions(raw, sources.length);
       if (suggestions.length === 0) {
         return NextResponse.json(
@@ -278,8 +294,10 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ suggestions, usage: usagePayload(usageInfo) });
     } catch (error) {
+      // Log the provider detail server-side; don't leak it to the client.
+      console.error("[preve] suggest AI failed:", error instanceof Error ? error.message : error);
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : "AI request failed.", usage: usagePayload(usageInfo) },
+        { error: "AI request failed. Please try again.", usage: usagePayload(usageInfo) },
         { status: 500 },
       );
     }
@@ -316,8 +334,10 @@ export async function POST(request: Request) {
     const result = stripReasoning(await chatComplete(system, userMessage));
     return NextResponse.json({ result, usage: usagePayload(usageInfo) });
   } catch (error) {
+    // Log the provider detail server-side; don't leak it to the client.
+    console.error("[preve] AI failed:", error instanceof Error ? error.message : error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "AI request failed.", usage: usagePayload(usageInfo) },
+      { error: "AI request failed. Please try again.", usage: usagePayload(usageInfo) },
       { status: 500 },
     );
   }

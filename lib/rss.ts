@@ -104,7 +104,8 @@ export function parseFeed(xml: string): NormalizedItem[] {
   const head = xml.slice(0, 2000).toLowerCase();
   const isAtom = /<feed[\s>]/.test(head) && !/<rss[\s>]/.test(head);
   const blockRe = isAtom ? /<entry\b[\s\S]*?<\/entry>/gi : /<item\b[\s\S]*?<\/item>/gi;
-  const blocks = xml.match(blockRe) || [];
+  // Cap items per feed so an enormous feed can't blow up memory / the archive.
+  const blocks = (xml.match(blockRe) || []).slice(0, 2000);
 
   const items: NormalizedItem[] = [];
   for (const block of blocks) {

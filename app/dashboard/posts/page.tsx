@@ -244,10 +244,12 @@ export default function PrevePostsPage() {
         return;
       }
       if (!res.ok) throw new Error(data.error || "AI request failed.");
-      const next = [...drafts];
-      next[index] = data.result || next[index];
-      setDrafts(next);
-      persist(suggestions, next, sources);
+      // Edits + deletes are disabled while a card is busy, so drafts/suggestions
+      // can't shift under us here; rebuild by index and persist the same arrays.
+      const result = data.result || "";
+      const nextDrafts = drafts.map((draft, i) => (i === index && result ? result : draft));
+      setDrafts(nextDrafts);
+      persist(suggestions, nextDrafts, sources);
     } catch (error) {
       setMessage({ ok: false, text: error instanceof Error ? error.message : "AI request failed." });
     } finally {
@@ -427,6 +429,7 @@ export default function PrevePostsPage() {
                 const ref = sources[suggestion.source - 1];
                 const draft = drafts[index] ?? "";
                 const busy = cardBusy === index;
+                const anyBusy = cardBusy !== null;
                 return (
                   <motion.article
                     key={`${suggestion.post.slice(0, 24)}-${index}`}
@@ -446,6 +449,7 @@ export default function PrevePostsPage() {
                     {/* Delete */}
                     <button
                       onClick={() => deleteCard(index)}
+                      disabled={anyBusy}
                       aria-label="Dismiss this idea"
                       title="Dismiss this idea"
                       style={{
@@ -454,8 +458,8 @@ export default function PrevePostsPage() {
                         right: "0.75rem",
                         background: "transparent",
                         border: "none",
-                        cursor: "pointer",
-                        opacity: 0.4,
+                        cursor: anyBusy ? "not-allowed" : "pointer",
+                        opacity: anyBusy ? 0.2 : 0.4,
                         display: "flex",
                         padding: "0.2rem",
                         borderRadius: "6px",
@@ -494,7 +498,7 @@ export default function PrevePostsPage() {
                       onChange={(event) => updateDraft(index, event.target.value)}
                       rows={Math.min(10, Math.max(4, Math.ceil((draft.length || 1) / 60)))}
                       style={{ ...fieldStyle, resize: "vertical", lineHeight: 1.55, opacity: busy ? 0.6 : 1 }}
-                      disabled={busy}
+                      disabled={anyBusy}
                     />
                     <div style={{ fontSize: "0.75rem", opacity: 0.5, marginTop: "0.3rem" }}>
                       {busy ? "Working…" : `${draft.length} chars`}
