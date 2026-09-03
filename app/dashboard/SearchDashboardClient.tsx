@@ -106,6 +106,7 @@ export default function DashboardPage() {
   const [filterDays, setFilterDays] = useState<"all" | "7" | "30" | "90" | "365">("all");
   const [searchMode, setSearchMode] = useState<"keyword" | "semantic">("keyword");
   const [indexing, setIndexing] = useState(false);
+  const [reindexTick, setReindexTick] = useState(0);
   const embeddedRef = useRef(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copied, setCopied] = useState(false);
@@ -384,6 +385,10 @@ export default function DashboardPage() {
     embeddedRef.current = true;
     setIndexing(true);
     buildEmbeddings()
+      // Re-run the active semantic search once new items are embedded.
+      .then((count) => {
+        if (count > 0) setReindexTick((tick) => tick + 1);
+      })
       .catch(() => {})
       .finally(() => setIndexing(false));
   }, [searchMode]);
@@ -450,7 +455,7 @@ export default function DashboardPage() {
     return () => {
       active = false;
     };
-  }, [debouncedQuery, filterPlatform, filterKind, filterDays, searchMode]);
+  }, [debouncedQuery, filterPlatform, filterKind, filterDays, searchMode, reindexTick]);
 
   const searchResults = serverResults;
   const activeFilterCount =
