@@ -215,6 +215,55 @@ export async function loadArchivePosts(): Promise<ArchiveLoadResult> {
   };
 }
 
+/**
+ * Accurate per-platform item counts straight from the DB (not the loaded cache),
+ * so the platform filter/list reflect everything the user imported. One cheap
+ * head-count per platform, run in parallel.
+ */
+export async function getArchivePlatformCounts(): Promise<Record<Platform, number>> {
+  const supabase = createClient();
+  const platforms = Object.keys(platformToDb) as Platform[];
+  const entries = await Promise.all(
+    platforms.map(async (platform) => {
+      const { count } = await supabase
+        .from("archive_items")
+        .select("*", { count: "exact", head: true })
+        .eq("platform", platformToDb[platform]);
+      return [platform, count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as Record<Platform, number>;
+}
+
+/**
+ * One page of the archive for the browse view, straight from the DB (so browse
+ * isn't limited to the cached snapshot). Newest first; optional platform filter.
+ */
+export async function browseArchive(
+  platform: Platform | "all",
+  offset: number,
+  limit = 30,
+  kind: PostKind | "all" = "all",
+  days: number | "all" = "all",
+): Promise<Post[]> {
+  const supabase = createClient();
+  let request = supabase
+    .from("archive_items")
+    .select(ARCHIVE_ITEM_COLUMNS)
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (platform !== "all") request = request.eq("platform", platformToDb[platform]);
+  if (kind !== "all") request = request.eq("kind", kindToDb[kind]);
+  if (days !== "all") {
+    request = request.gte("published_at", new Date(Date.now() - days * 86_400_000).toISOString());
+  }
+
+  const { data, error } = await request;
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as ArchiveItemRow[]).map(postFromRow);
+}
+
 export async function importManualArchive(input: ManualImportInput) {
   const userId = await getUserId();
   const supabase = createClient();

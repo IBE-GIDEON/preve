@@ -24,7 +24,8 @@ import {
 } from "../lib/preveState";
 import { recordSearch } from "../../lib/workspace/client";
 import {
-  getArchiveStats,
+  browseArchive,
+  getArchivePlatformCounts,
   getSimilarArchivePosts,
   loadArchivePostsCached,
   toggleArchiveItemSaved,
@@ -79,6 +80,25 @@ export default function DashboardPage() {
   const [archivePosts, setArchivePosts] = useState<Post[]>([]);
   const [savedPostIds, setSavedPostIds] = useState<string[]>([]);
   const [archiveLoading, setArchiveLoading] = useState(true);
+  // Accurate per-platform counts from the DB (not the capped cache).
+  const [platformCounts, setPlatformCounts] = useState<Record<Platform, number>>({
+    Reddit: 0,
+    X: 0,
+    LinkedIn: 0,
+    Bluesky: 0,
+    Mastodon: 0,
+    RSS: 0,
+    HackerNews: 0,
+    Devto: 0,
+    Lemmy: 0,
+  });
+  // Paginated, DB-backed browse list (infinite scroll — no cap).
+  const [browsePosts, setBrowsePosts] = useState<Post[]>([]);
+  const [browseOffset, setBrowseOffset] = useState(0);
+  const [browseHasMore, setBrowseHasMore] = useState(true);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const browseSentinelRef = useRef<HTMLDivElement>(null);
+  const BROWSE_PAGE = 30;
   const [archiveMessage, setArchiveMessage] = useState("");
   const [preveState, setPreveState] = useState<PreveState>(DEFAULT_PREVE_STATE);
   const [collectionsList, setCollectionsList] = useState<Collection[]>([]);
@@ -98,10 +118,11 @@ export default function DashboardPage() {
     loadArchive();
   }, []);
 
-  // Only platforms the user actually has content on (dropdowns stay honest).
+  // Only platforms the user actually has content on (from real DB counts, so
+  // the list reflects everything imported — not just the loaded page).
   const platformsWithContent = useMemo(
-    () => PLATFORM_ORDER.filter((platform) => archivePosts.some((post) => post.platform === platform)),
-    [archivePosts],
+    () => PLATFORM_ORDER.filter((platform) => (platformCounts[platform] ?? 0) > 0),
+    [platformCounts],
   );
 
   // Where you can repurpose *to*: X + LinkedIn always (top destinations you
@@ -113,10 +134,10 @@ export default function DashboardPage() {
 
   // If the selected platform disappears from the archive, fall back to All.
   useEffect(() => {
-    if (filterPlatform !== "all" && archivePosts.length > 0 && !platformsWithContent.includes(filterPlatform)) {
+    if (filterPlatform !== "all" && platformsWithContent.length > 0 && !platformsWithContent.includes(filterPlatform)) {
       setFilterPlatform("all");
     }
-  }, [filterPlatform, platformsWithContent, archivePosts.length]);
+  }, [filterPlatform, platformsWithContent]);
 
   useEffect(() => {
     if (searchValue === "") setSelectedPost(null);
@@ -186,6 +207,8 @@ export default function DashboardPage() {
         setSavedPostIds(result.savedPostIds);
         setArchiveLoading(false);
       });
+      // Accurate per-platform counts (browse/filter use these, not the cache).
+      void getArchivePlatformCounts().then(setPlatformCounts).catch(() => {});
     } catch (error) {
       setArchiveMessage(error instanceof Error ? error.message : "Could not load your archive.");
     } finally {
@@ -389,21 +412,76 @@ export default function DashboardPage() {
     (filterPlatform !== "all" ? 1 : 0) + (filterKind !== "all" ? 1 : 0) + (filterDays !== "all" ? 1 : 0);
   const resultTopics = Array.from(new Set(searchResults.flatMap((post) => post.topics))).slice(0, 5);
   const resultPlatforms = Array.from(new Set(searchResults.map((post) => post.platform)));
-  const totals = getArchiveStats(archivePosts);
+  const indexedTotal = useMemo(
+    () => (Object.values(platformCounts) as number[]).reduce((sum, n) => sum + n, 0),
+    [platformCounts],
+  );
+  const totals = { indexed: indexedTotal, platformCounts };
   const similarPosts = selectedPost ? getSimilarArchivePosts(archivePosts, selectedPost) : [];
   const selectedPostSaved = selectedPost ? savedPostIds.includes(selectedPost.id) : false;
 
-  // Browse mode: with no query, the page shows the whole archive (newest
-  // first, already ordered by the loader), narrowed by the same filters.
-  const filteredArchive = archivePosts.filter((post) => {
-    if (filterPlatform !== "all" && post.platform !== filterPlatform) return false;
-    if (filterKind !== "all" && post.kind !== filterKind) return false;
-    if (filterDays !== "all") {
-      const cutoff = Date.now() - Number(filterDays) * 86_400_000;
-      if (!post.publishedAt || new Date(post.publishedAt).getTime() < cutoff) return false;
+  // Browse mode (no query): page through the whole archive from the DB with
+  // infinite scroll, so it's never capped at the loaded snapshot.
+  async function loadMoreBrowse() {
+    if (browseLoading || !browseHasMore || searchValue !== "") return;
+    setBrowseLoading(true);
+    try {
+      const days = filterDays === "all" ? "all" : Number(filterDays);
+      const page = await browseArchive(filterPlatform, browseOffset, BROWSE_PAGE, filterKind, days);
+      setBrowsePosts((prev) => [...prev, ...page]);
+      setBrowseOffset((prev) => prev + page.length);
+      setBrowseHasMore(page.length === BROWSE_PAGE);
+    } catch {
+      setBrowseHasMore(false);
+    } finally {
+      setBrowseLoading(false);
     }
-    return true;
-  });
+  }
+  const loadMoreBrowseRef = useRef<() => void>(() => {});
+  loadMoreBrowseRef.current = loadMoreBrowse;
+
+  // Reset + load the first page whenever the browse filters change (or browse opens).
+  useEffect(() => {
+    if (searchValue !== "") return;
+    let active = true;
+    setBrowseLoading(true);
+    setBrowsePosts([]);
+    setBrowseOffset(0);
+    setBrowseHasMore(true);
+    const days = filterDays === "all" ? "all" : Number(filterDays);
+    browseArchive(filterPlatform, 0, BROWSE_PAGE, filterKind, days)
+      .then((page) => {
+        if (!active) return;
+        setBrowsePosts(page);
+        setBrowseOffset(page.length);
+        setBrowseHasMore(page.length === BROWSE_PAGE);
+      })
+      .catch(() => {
+        if (active) setBrowseHasMore(false);
+      })
+      .finally(() => {
+        if (active) setBrowseLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [searchValue, filterPlatform, filterKind, filterDays]);
+
+  // Load the next page when the sentinel nears the viewport. Re-attach after each
+  // page so a still-visible sentinel keeps loading until the viewport is filled.
+  useEffect(() => {
+    if (searchValue !== "" || !browseHasMore) return;
+    const el = browseSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMoreBrowseRef.current();
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [searchValue, browsePosts.length, browseHasMore]);
 
   function renderPostCard(post: Post) {
     const isExpanded = expandedPosts.has(post.id);
@@ -704,7 +782,7 @@ export default function DashboardPage() {
                 searchResults.map((post) => renderPostCard(post))
               )}
             </motion.div>
-          ) : archivePosts.length > 0 ? (
+          ) : totals.indexed > 0 || browsePosts.length > 0 || browseLoading ? (
             <motion.div
               key="browse-view"
               initial={{ opacity: 0, y: 20 }}
@@ -715,16 +793,29 @@ export default function DashboardPage() {
               {filterBar}
 
               <h4 style={{ opacity: 0.5, marginBottom: "1rem" }}>
-                {filteredArchive.length.toLocaleString()} of {archivePosts.length.toLocaleString()} post
-                {archivePosts.length === 1 ? "" : "s"} in your archive · start typing to search
+                {filterPlatform === "all"
+                  ? `${formatNumber(totals.indexed)} ${totals.indexed === 1 ? "post" : "posts"} in your archive`
+                  : `${formatNumber(totals.platformCounts[filterPlatform] ?? 0)} ${getPlatformLabel(filterPlatform)} ${(totals.platformCounts[filterPlatform] ?? 0) === 1 ? "post" : "posts"}`}{" "}
+                · start typing to search
               </h4>
 
-              {filteredArchive.length === 0 ? (
+              {browsePosts.length === 0 && !browseLoading ? (
                 <div style={{ textAlign: "center", opacity: 0.5, marginTop: "3rem" }}>
                   No posts match these filters.
                 </div>
               ) : (
-                filteredArchive.map((post) => renderPostCard(post))
+                <>
+                  {browsePosts.map((post) => renderPostCard(post))}
+                  <div ref={browseSentinelRef} style={{ height: "1px" }} aria-hidden="true" />
+                  {browseLoading && (
+                    <div style={{ textAlign: "center", opacity: 0.5, margin: "1.5rem 0" }}>Loading more…</div>
+                  )}
+                  {!browseHasMore && browsePosts.length > 0 && (
+                    <div style={{ textAlign: "center", opacity: 0.35, margin: "1.5rem 0", fontSize: "0.85rem" }}>
+                      That&rsquo;s everything.
+                    </div>
+                  )}
+                </>
               )}
             </motion.div>
           ) : (
