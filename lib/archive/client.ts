@@ -202,7 +202,7 @@ export async function loadArchivePosts(): Promise<ArchiveLoadResult> {
       .from("archive_items")
       .select(ARCHIVE_ITEM_COLUMNS)
       .order("created_at", { ascending: false })
-      .limit(500),
+      .limit(1000),
     supabase.from("saved_archive_items").select("archive_item_id"),
   ]);
 
@@ -270,6 +270,41 @@ export async function importManualArchive(input: ManualImportInput) {
   });
 
   return rows.length;
+}
+
+/** Clear the stale-while-revalidate snapshot (call after a destructive change). */
+export async function clearArchiveCache(): Promise<void> {
+  try {
+    const key = await archiveCacheKey();
+    if (key) sessionStorage.removeItem(key);
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Delete every imported item for one platform (RLS-scoped to the caller) and
+ * reset that platform's connection + import log. Embeddings and saved rows are
+ * removed automatically via ON DELETE CASCADE. Returns the number deleted.
+ */
+export async function deleteArchiveByPlatform(platform: Platform): Promise<number> {
+  const userId = await getUserId();
+  const supabase = createClient();
+  const dbPlatform = platformToDb[platform];
+
+  const { error, count } = await supabase
+    .from("archive_items")
+    .delete({ count: "exact" })
+    .eq("user_id", userId)
+    .eq("platform", dbPlatform);
+  if (error) throw new Error(error.message);
+
+  // Reset the connection + import history for that platform (best-effort).
+  await supabase.from("connected_accounts").delete().eq("user_id", userId).eq("platform", dbPlatform);
+  await supabase.from("import_jobs").delete().eq("user_id", userId).eq("platform", dbPlatform);
+
+  await clearArchiveCache();
+  return count ?? 0;
 }
 
 export async function toggleArchiveItemSaved(archiveItemId: string, shouldSave: boolean) {

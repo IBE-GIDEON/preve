@@ -6,14 +6,15 @@ import type { Platform, Post, PostKind } from "../../data/mockPosts";
 import { getPlatformColor } from "../../data/mockPosts";
 import { PLATFORM_ORDER } from "../../lib/preveState";
 import { PlatformIcon } from "../../../components/PlatformIcon";
-import { getArchiveStats, importManualArchive, loadArchivePostsCached } from "../../../lib/archive/client";
+import { deleteArchiveByPlatform, getArchiveStats, importManualArchive, loadArchivePostsCached } from "../../../lib/archive/client";
+import ConfirmDialog from "../../../components/ConfirmDialog";
 import { buildEmbeddings } from "../../../lib/semantic/client";
 import { getConnectPlatform } from "../../../lib/connect-platforms";
 import { clearImportJobs, getRecentImportJobs, type ImportJob } from "../../../lib/imports/client";
 import { isValidBlueskyHandle, normalizeBlueskyHandle } from "../../../lib/bluesky-shared";
 import { isRedditEnabled } from "../../../lib/flags";
 import { fetchRedditPublicArchiveInBrowser, isFatalRedditError } from "../../../lib/reddit-browser";
-import { parseRedditExportCsv } from "../../../lib/reddit-export";
+import { isRedditExportFile, parseRedditExportCsv } from "../../../lib/reddit-export";
 import { isLinkedInExportFile, parseLinkedInExportCsv } from "../../../lib/linkedin-export";
 import { isTwitterExportFile, parseTwitterExportJs } from "../../../lib/twitter-export";
 import { readZipTextEntries } from "../../../lib/zip";
@@ -58,6 +59,28 @@ function countImportItems(rawText: string) {
     .filter(Boolean).length;
 }
 
+// Shared export-upload collector: accepts the raw .zip, loose files, OR a whole
+// unzipped folder (webkitdirectory). `wanted` picks which files to read (by
+// lowercased basename) both inside a zip and among loose/folder files; `parse`
+// turns each file's text into archive items.
+async function collectItemsFromUpload(
+  files: FileList,
+  wanted: (baseName: string) => boolean,
+  parse: (text: string) => NormalizedItem[],
+): Promise<NormalizedItem[]> {
+  const items: NormalizedItem[] = [];
+  for (const file of Array.from(files)) {
+    const isZip = file.name.toLowerCase().endsWith(".zip") || file.type.includes("zip");
+    if (isZip) {
+      const entries = await readZipTextEntries(await file.arrayBuffer(), wanted);
+      for (const text of Object.values(entries)) items.push(...parse(text));
+    } else if (wanted(file.name.toLowerCase())) {
+      items.push(...parse(await file.text()));
+    }
+  }
+  return items;
+}
+
 function jobStatusLabel(status: ImportJob["status"]) {
   return { queued: "Queued", running: "Importing", completed: "Completed", failed: "Failed" }[status];
 }
@@ -86,6 +109,8 @@ export default function ImportsPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
   const [clearingImports, setClearingImports] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Platform | null>(null);
+  const [deletingArchive, setDeletingArchive] = useState(false);
   const [redditUsername, setRedditUsername] = useState("");
   const [redditImporting, setRedditImporting] = useState(false);
   const [redditMessage, setRedditMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -113,7 +138,9 @@ export default function ImportsPage() {
   const [lemmyImporting, setLemmyImporting] = useState(false);
   const [lemmyMessage, setLemmyMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const exportInputRef = useRef<HTMLInputElement>(null);
+  const redditFolderInputRef = useRef<HTMLInputElement>(null);
   const linkedinInputRef = useRef<HTMLInputElement>(null);
+  const linkedinFolderInputRef = useRef<HTMLInputElement>(null);
   const twitterInputRef = useRef<HTMLInputElement>(null);
   const twitterFolderInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -136,10 +163,13 @@ export default function ImportsPage() {
     void refreshArchive();
   }, []);
 
-  // Enable whole-folder selection on the X input (for archives users already
-  // unzipped). webkitdirectory isn't a typed React prop, so set it imperatively.
+  // Enable whole-folder selection on the export inputs (for archives users
+  // already unzipped). webkitdirectory isn't a typed React prop, so set it
+  // imperatively on each folder input.
   useEffect(() => {
-    twitterFolderInputRef.current?.setAttribute("webkitdirectory", "");
+    for (const ref of [redditFolderInputRef, linkedinFolderInputRef, twitterFolderInputRef]) {
+      ref.current?.setAttribute("webkitdirectory", "");
+    }
   }, []);
 
   async function refreshArchive() {
@@ -171,6 +201,20 @@ export default function ImportsPage() {
       setStatusMessage(error instanceof Error ? error.message : "Couldn't clear the import log.");
     } finally {
       setClearingImports(false);
+    }
+  }
+
+  async function confirmDeletePlatform() {
+    if (!deleteTarget || deletingArchive) return;
+    setDeletingArchive(true);
+    try {
+      await deleteArchiveByPlatform(deleteTarget);
+      await refreshArchive();
+      setDeleteTarget(null);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Couldn't delete that platform's data.");
+    } finally {
+      setDeletingArchive(false);
     }
   }
 
@@ -402,12 +446,9 @@ export default function ImportsPage() {
     setRedditMessage(null);
 
     try {
-      const items: NormalizedItem[] = [];
-      for (const file of Array.from(files)) {
-        items.push(...parseRedditExportCsv(await file.text()));
-      }
+      const items = await collectItemsFromUpload(files, isRedditExportFile, parseRedditExportCsv);
       if (items.length === 0) {
-        throw new Error("No posts or comments found. Upload posts.csv or comments.csv from your Reddit export.");
+        throw new Error("No posts or comments found. Drop the .zip, the extracted folder, or posts.csv / comments.csv.");
       }
 
       const imported = await ingestInChunks(username, items);
@@ -422,6 +463,7 @@ export default function ImportsPage() {
     } finally {
       setExportImporting(false);
       if (exportInputRef.current) exportInputRef.current.value = "";
+      if (redditFolderInputRef.current) redditFolderInputRef.current.value = "";
     }
   }
 
@@ -448,19 +490,10 @@ export default function ImportsPage() {
     setLinkedinMessage(null);
 
     try {
-      const items: NormalizedItem[] = [];
-      for (const file of Array.from(files)) {
-        const isZip = file.name.toLowerCase().endsWith(".zip") || file.type.includes("zip");
-        if (isZip) {
-          const entries = await readZipTextEntries(await file.arrayBuffer(), isLinkedInExportFile);
-          for (const text of Object.values(entries)) items.push(...parseLinkedInExportCsv(text));
-        } else {
-          items.push(...parseLinkedInExportCsv(await file.text()));
-        }
-      }
+      const items = await collectItemsFromUpload(files, isLinkedInExportFile, parseLinkedInExportCsv);
       if (items.length === 0) {
         throw new Error(
-          "No posts or comments found. Drop the .zip LinkedIn emailed you, or its Shares.csv / Comments.csv.",
+          "No posts or comments found. Drop the .zip, the extracted folder, or Shares.csv / Comments.csv.",
         );
       }
 
@@ -475,6 +508,7 @@ export default function ImportsPage() {
     } finally {
       setLinkedinImporting(false);
       if (linkedinInputRef.current) linkedinInputRef.current.value = "";
+      if (linkedinFolderInputRef.current) linkedinFolderInputRef.current.value = "";
     }
   }
 
@@ -501,18 +535,7 @@ export default function ImportsPage() {
     setTwitterMessage(null);
 
     try {
-      const items: NormalizedItem[] = [];
-      for (const file of Array.from(files)) {
-        const isZip = file.name.toLowerCase().endsWith(".zip") || file.type.includes("zip");
-        if (isZip) {
-          const entries = await readZipTextEntries(await file.arrayBuffer(), isTwitterExportFile);
-          for (const text of Object.values(entries)) items.push(...parseTwitterExportJs(text));
-        } else if (isTwitterExportFile(file.name)) {
-          // A folder selection includes assets/account.js/the .html too — only
-          // parse the tweet file(s) (data/tweets.js, tweets-part*.js).
-          items.push(...parseTwitterExportJs(await file.text()));
-        }
-      }
+      const items = await collectItemsFromUpload(files, isTwitterExportFile, parseTwitterExportJs);
       if (items.length === 0) {
         throw new Error(
           "No tweets found. Drop the .zip, pick the extracted archive folder, or select data/tweets.js.",
@@ -685,17 +708,34 @@ export default function ImportsPage() {
                 >
                   reddit.com/settings/data-request
                 </a>
-                , unzip the file Reddit emails you, then drop <code>posts.csv</code> and <code>comments.csv</code> here.
+                , then drop the <code>.zip</code> Reddit emails you &mdash; or the unzipped folder, or{" "}
+                <code>posts.csv</code> / <code>comments.csv</code>.
               </div>
-              <input
-                ref={exportInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                multiple
-                disabled={exportImporting}
-                onChange={(event) => void handleRedditExportUpload(event.target.files)}
-                style={{ fontSize: "0.85rem", opacity: exportImporting ? 0.5 : 0.9, maxWidth: "100%" }}
-              />
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "flex-start" }}>
+                <label style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                  <span style={{ opacity: 0.7 }}>The .zip (or CSVs)</span>
+                  <input
+                    ref={exportInputRef}
+                    type="file"
+                    accept=".zip,.csv,application/zip,text/csv"
+                    multiple
+                    disabled={exportImporting}
+                    onChange={(event) => void handleRedditExportUpload(event.target.files)}
+                    style={{ fontSize: "0.85rem", opacity: exportImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+                  />
+                </label>
+                <label style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                  <span style={{ opacity: 0.7 }}>Or the unzipped folder</span>
+                  <input
+                    ref={redditFolderInputRef}
+                    type="file"
+                    multiple
+                    disabled={exportImporting}
+                    onChange={(event) => void handleRedditExportUpload(event.target.files)}
+                    style={{ fontSize: "0.85rem", opacity: exportImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+                  />
+                </label>
+              </div>
               {exportImporting && (
                 <div style={{ fontSize: "0.85rem", opacity: 0.6, marginTop: "0.5rem" }}>Reading your export…</div>
               )}
@@ -761,20 +801,36 @@ export default function ImportsPage() {
                 LinkedIn emails you a <code>.zip</code> — usually in ~10 min, up to 24 h.
               </li>
               <li>
-                Drop the whole <code>.zip</code> below — preve finds <code>Shares.csv</code> &amp;{" "}
-                <code>Comments.csv</code> inside for you.
+                Drop the <code>.zip</code> below &mdash; or, if you unzipped it, the extracted folder &mdash; preve
+                finds <code>Shares.csv</code> &amp; <code>Comments.csv</code> for you.
               </li>
             </ol>
 
-            <input
-              ref={linkedinInputRef}
-              type="file"
-              accept=".zip,.csv,application/zip,text/csv"
-              multiple
-              disabled={linkedinImporting}
-              onChange={(event) => void handleLinkedInExportUpload(event.target.files)}
-              style={{ fontSize: "0.85rem", opacity: linkedinImporting ? 0.5 : 0.9, maxWidth: "100%" }}
-            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", alignItems: "flex-start" }}>
+              <label style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <span style={{ opacity: 0.7 }}>The .zip (or CSVs)</span>
+                <input
+                  ref={linkedinInputRef}
+                  type="file"
+                  accept=".zip,.csv,application/zip,text/csv"
+                  multiple
+                  disabled={linkedinImporting}
+                  onChange={(event) => void handleLinkedInExportUpload(event.target.files)}
+                  style={{ fontSize: "0.85rem", opacity: linkedinImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+                />
+              </label>
+              <label style={{ fontSize: "0.85rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <span style={{ opacity: 0.7 }}>Or the unzipped folder</span>
+                <input
+                  ref={linkedinFolderInputRef}
+                  type="file"
+                  multiple
+                  disabled={linkedinImporting}
+                  onChange={(event) => void handleLinkedInExportUpload(event.target.files)}
+                  style={{ fontSize: "0.85rem", opacity: linkedinImporting ? 0.5 : 0.9, maxWidth: "100%" }}
+                />
+              </label>
+            </div>
             {linkedinImporting && (
               <div style={{ fontSize: "0.85rem", opacity: 0.6, marginTop: "0.5rem" }}>Reading your export…</div>
             )}
@@ -1559,8 +1615,59 @@ export default function ImportsPage() {
               </div>
             </div>
           )}
+
+          {platformsWithContent.length > 0 && (
+            <div style={{ marginTop: "2rem" }}>
+              <h3 className="suggestions-heading" style={{ margin: "0 0 0.35rem" }}>Manage imported data</h3>
+              <div style={{ opacity: 0.55, fontSize: "0.8rem", marginBottom: "1rem", lineHeight: 1.5 }}>
+                Delete everything imported from a platform. This removes those posts from your archive, search, and
+                preve Posts, and can&rsquo;t be undone.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                {platformsWithContent.map((platform) => (
+                  <div
+                    key={platform}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}
+                  >
+                    <span style={{ fontSize: "0.9rem" }}>
+                      <span style={{ fontWeight: 600, color: getPlatformColor(platform) }}>
+                        {getPlatformName(platform)}
+                      </span>
+                      <span style={{ opacity: 0.55 }}> · {formatNumber(totals.platformCounts[platform])} items</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(platform)}
+                      style={{
+                        background: "none",
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        borderRadius: "8px",
+                        color: "#ef4444",
+                        cursor: "pointer",
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        padding: "0.35rem 0.7rem",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </aside>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={`Delete your ${deleteTarget ? getPlatformName(deleteTarget) : ""} data?`}
+        message={`This permanently removes all ${deleteTarget ? getPlatformName(deleteTarget) : ""} posts from your archive, search, and preve Posts. This can't be undone.`}
+        confirmLabel="Delete"
+        busy={deletingArchive}
+        onConfirm={confirmDeletePlatform}
+        onCancel={() => (deletingArchive ? undefined : setDeleteTarget(null))}
+      />
     </div>
   );
 }

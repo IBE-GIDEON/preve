@@ -53,7 +53,9 @@ export function getPlatformColor(platform: Platform) {
     case "LinkedIn":
       return "#0A66C2";
     case "X":
-      return "#000000";
+      // X's brand is black, which is invisible on the dark theme — use the
+      // theme's foreground so the label is always readable.
+      return "var(--foreground)";
     default:
       return "var(--foreground)";
   }

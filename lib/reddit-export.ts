@@ -54,6 +54,12 @@ function parseExportDate(raw: string): string {
   return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
 }
 
+/** File names inside the Reddit data export ZIP that we parse. */
+export function isRedditExportFile(baseName: string): boolean {
+  const n = baseName.toLowerCase();
+  return n === "posts.csv" || n === "comments.csv";
+}
+
 /**
  * Parse one CSV from a Reddit data export into normalized archive items.
  * Detects posts.csv vs comments.csv by the header row (posts have "title").
